@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-const API_URL = "http://localhost:3001/api/meal-plan";
+const API_URL = "https://meal-planner-backend-0ul2.onrender.com/api/meal-plan";
 
 const PLANS = [
   { id: "free", label: "Free", price: "$0", color: "#a3b18a", perks: ["1 meal plan/month", "Basic recipes", "3-day plans only"] },
