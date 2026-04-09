@@ -153,57 +153,44 @@ Respond ONLY with valid JSON (no markdown):
   function buildPrompt() {
     const ag   = AGE_GROUPS[prefs.ageGroup];
     const days = plan.planDays;
-    return `You are a world-class Indian nutritionist and chef. Generate a detailed ${days}-day meal plan.
+    return `You are an expert Indian nutritionist. Generate a ${days}-day Indian meal plan.
 
-PROFILE:
-- Age Group: ${ag.label} (${ag.range})
-- Dietary preference: ${prefs.diet}
-- Cuisine: ${prefs.cuisine}
-- Allergies/restrictions: ${prefs.allergies || "None"}
-- Family size: ${prefs.familySize} people
-- Daily calorie target: ${prefs.calories} kcal
-- Health goal: ${prefs.goal}
-- Cook time preference: ${prefs.cookTime}
-- Market: India (use ingredients available in Indian supermarkets)
+Diet: ${prefs.diet} | Cuisine: ${prefs.cuisine} | Calories: ${prefs.calories} kcal/day
+Age group: ${ag.label} (${ag.range}) | Family: ${prefs.familySize} people
+Goal: ${prefs.goal} | Cook time: ${prefs.cookTime}
+Allergies: ${prefs.allergies || "None"}
+Nutrition focus: ${ag.nutritionFocus}
+${prefs.ageGroup === "kids" ? "No spicy food. Fun colorful meals." : ""}
+${prefs.ageGroup === "seniors" ? "Soft textures, low sodium, easy digestion." : ""}
+${prefs.ageGroup === "teens" ? "High protein, satisfying portions." : ""}
 
-NUTRITION FOCUS for ${ag.label}: ${ag.nutritionFocus}
-Typical calorie range: ${ag.calorieRange} kcal/day
-
-REQUIREMENTS:
-- Use authentic Indian dishes with locally available ingredients
-- Include regional variety (South Indian, North Indian, etc.)
-- Include difficulty level for each meal
-${prefs.ageGroup === "kids" ? "- Make meals fun and colorful. No spicy food." : ""}
-${prefs.ageGroup === "seniors" ? "- Use soft textures, low sodium, easy digestion." : ""}
-${prefs.ageGroup === "teens" ? "- High protein, satisfying portions for active teens." : ""}
+Use authentic Indian dishes. Keep descriptions to ONE short sentence only.
 
 Respond ONLY with valid JSON (no markdown, no backticks):
 {
-  "planName": "Descriptive plan name",
+  "planName": "Short plan name",
   "ageGroup": "${prefs.ageGroup}",
   "days": [
     {
       "day": "Monday",
       "totalCalories": 1900,
       "meals": {
-        "breakfast": { "name": "...", "calories": 400, "time": "10 min", "difficulty": "Easy", "description": "..." },
-        "lunch":     { "name": "...", "calories": 550, "time": "20 min", "difficulty": "Easy", "description": "..." },
-        "dinner":    { "name": "...", "calories": 700, "time": "30 min", "difficulty": "Medium", "description": "..." },
-        "snack":     { "name": "...", "calories": 200, "time": "5 min",  "difficulty": "Easy", "description": "..." }
+        "breakfast": { "name": "Poha", "calories": 350, "time": "15 min", "difficulty": "Easy", "description": "One sentence." },
+        "lunch":     { "name": "Dal Rice", "calories": 550, "time": "20 min", "difficulty": "Easy", "description": "One sentence." },
+        "dinner":    { "name": "Palak Paneer", "calories": 650, "time": "30 min", "difficulty": "Medium", "description": "One sentence." },
+        "snack":     { "name": "Chai", "calories": 150, "time": "5 min", "difficulty": "Easy", "description": "One sentence." }
       }
     }
   ],
   "shopping_list": {
-    "Vegetables & Greens": ["item1"],
+    "Vegetables": ["item1"],
     "Dal & Pulses": ["item1"],
-    "Grains & Rice": ["item1"],
+    "Grains": ["item1"],
     "Dairy": ["item1"],
-    "Spices & Masalas": ["item1"],
-    "Oils & Ghee": ["item1"],
-    "Fruits": ["item1"]
+    "Spices": ["item1"]
   },
-  "nutrition_summary": "2-3 sentence summary.",
-  "weekly_tips": ["tip1", "tip2", "tip3"]
+  "nutrition_summary": "One sentence only.",
+  "weekly_tips": ["tip1", "tip2"]
 }`;
   }
 
