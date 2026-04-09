@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
 import "./styles/global.css";
 
+import CalorieTracker from "./pages/CalorieTracker";
+import GoalTracker    from "./pages/GoalTracker";
+
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SubProvider } from "./context/SubContext";
 
@@ -82,6 +85,11 @@ function InnerApp() {
         return <ProtectedRoute navigate={navigate}><MyBookings navigate={navigate} /></ProtectedRoute>;
       case "referral":
         return <ProtectedRoute navigate={navigate}><Referral navigate={navigate} /></ProtectedRoute>;
+
+      case "calories":
+  return <ProtectedRoute navigate={navigate}><CalorieTracker navigate={navigate} /></ProtectedRoute>;
+case "goals":
+  return <ProtectedRoute navigate={navigate}><GoalTracker navigate={navigate} /></ProtectedRoute>;  
       default:
         return <Landing navigate={navigate} />;
     }
