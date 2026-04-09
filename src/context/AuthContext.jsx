@@ -13,11 +13,10 @@ import { auth, db, googleProvider } from "../firebase";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
+  const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Listen to Firebase auth state
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -45,6 +44,8 @@ export function AuthProvider({ children }) {
         plansUsed:    0,
         plansResetAt: serverTimestamp(),
         createdAt:    serverTimestamp(),
+        gender:       extra.gender || "",
+        bookings:     [],
         ...extra,
       };
       await setDoc(ref, data);
@@ -60,10 +61,11 @@ export function AuthProvider({ children }) {
     return cred.user;
   }
 
-  async function signupWithEmail(email, password, name) {
+  // ── extra = { gender: "Female" } etc ─────────────────────────────────────
+  async function signupWithEmail(email, password, name, extra = {}) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: name });
-    await createUserDoc(cred.user, { displayName: name });
+    await createUserDoc(cred.user, { displayName: name, ...extra });
     return cred.user;
   }
 

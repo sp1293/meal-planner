@@ -14,6 +14,7 @@ export default function Navbar({ page, navigate }) {
         { id: "dashboard",   label: "Dashboard" },
         { id: "planner",     label: "Meal Planner" },
         { id: "my-plans",    label: "My Plans" },
+        { id: "trainers",    label: "Trainers" },
       ]
     : [];
 
@@ -23,88 +24,42 @@ export default function Navbar({ page, navigate }) {
   }
 
   const s = {
-    nav: {
-      position: "sticky", top: 0, zIndex: 200,
-      background: "rgba(255,255,255,0.95)",
-      backdropFilter: "blur(12px)",
-      borderBottom: "1px solid var(--border)",
-      boxShadow: "var(--shadow-xs)",
-    },
-    inner: {
-      maxWidth: 1120, margin: "0 auto", padding: "0 24px",
-      height: 64, display: "flex", alignItems: "center", justifyContent: "space-between",
-    },
-    brand: {
-      display: "flex", alignItems: "center", gap: 10, cursor: "pointer",
-    },
-    brandLogo: {
-      width: 36, height: 36, borderRadius: 10,
-      background: "var(--primary)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 18,
-    },
-    brandName: {
-      fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700,
-      color: "var(--primary-dark)",
-    },
+    nav: { position: "sticky", top: 0, zIndex: 200, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)", boxShadow: "var(--shadow-xs)" },
+    inner: { maxWidth: 1120, margin: "0 auto", padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" },
+    brand: { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
+    brandLogo: { width: 36, height: 36, borderRadius: 10, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 },
+    brandName: { fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "var(--primary-dark)" },
     links: { display: "flex", alignItems: "center", gap: 4 },
-    link: {
-      padding: "7px 14px", borderRadius: "var(--radius-sm)",
-      fontSize: 14, fontWeight: 500, color: "var(--text-3)",
-      border: "none", background: "none", transition: "var(--transition)",
-    },
+    link: { padding: "7px 14px", borderRadius: "var(--radius-sm)", fontSize: 14, fontWeight: 500, color: "var(--text-3)", border: "none", background: "none", transition: "var(--transition)", cursor: "pointer", fontFamily: "var(--font-body)" },
     linkActive: { color: "var(--primary)", background: "var(--primary-pale)", fontWeight: 600 },
     right: { display: "flex", alignItems: "center", gap: 10 },
-    tierBadge: {
-      padding: "4px 12px", borderRadius: "var(--radius-full)",
-      fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px",
-      background: plan.colorLight || "var(--green-100)",
-      color: plan.color || "var(--green-800)",
-    },
-    avatar: {
-      width: 36, height: 36, borderRadius: "50%",
-      background: "var(--primary)", color: "#fff",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 14, fontWeight: 700, cursor: "pointer",
-      border: "2px solid var(--primary-soft)",
-    },
-    dropdown: {
-      position: "absolute", top: 56, right: 24,
-      background: "#fff", border: "1px solid var(--border)",
-      borderRadius: "var(--radius-md)", padding: "8px",
-      boxShadow: "var(--shadow-lg)", minWidth: 200,
-      animation: "slideDown 0.2s ease forwards",
-    },
-    dropItem: {
-      width: "100%", padding: "10px 14px", borderRadius: "var(--radius-xs)",
-      fontSize: 14, color: "var(--text-2)", background: "none", border: "none",
-      textAlign: "left", transition: "var(--transition)", display: "block",
-    },
+    tierBadge: { padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: plan.colorLight || "var(--green-100)", color: plan.color || "var(--green-800)" },
+    avatar: { width: 36, height: 36, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, cursor: "pointer", border: "2px solid var(--primary-soft)" },
+    dropdown: { position: "absolute", top: 56, right: 24, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 210, animation: "slideDown 0.2s ease forwards" },
+    dropItem: { width: "100%", padding: "10px 14px", borderRadius: "var(--radius-xs)", fontSize: 14, color: "var(--text-2)", background: "none", border: "none", textAlign: "left", transition: "var(--transition)", display: "block", cursor: "pointer", fontFamily: "var(--font-body)" },
   };
 
-  const initials = (profile?.displayName || user?.email || "U")
-    .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  const initials = (profile?.displayName || user?.email || "U").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
   return (
     <nav style={s.nav}>
       <div style={s.inner}>
-        {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
           <div style={s.brandLogo}>🥗</div>
           <span style={s.brandName}>NourishAI</span>
         </div>
 
-        {/* Links */}
         <div style={s.links} className="hide-mobile">
           {navLinks.map(l => (
-            <button key={l.id} style={{ ...s.link, ...(page === l.id ? s.linkActive : {}) }}
-              onClick={() => navigate(l.id)}>
+            <button key={l.id} style={{ ...s.link, ...(page === l.id ? s.linkActive : {}) }} onClick={() => navigate(l.id)}>
               {l.label}
             </button>
           ))}
+          <button style={{ ...s.link, ...(page === "guidelines" ? s.linkActive : {}) }} onClick={() => navigate("guidelines")}>
+            Guidelines
+          </button>
         </div>
 
-        {/* Right side */}
         <div style={s.right}>
           {user ? (
             <>
@@ -122,14 +77,16 @@ export default function Navbar({ page, navigate }) {
                       <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user.email}</div>
                     </div>
                     {[
-                      { label: "Dashboard",     id: "dashboard" },
-                      { label: "Meal Planner",  id: "planner" },
-                      { label: "My Plans",      id: "my-plans" },
-                      { label: "Account",       id: "account" },
-                      { label: "Subscription",  id: "subscription" },
+                      { label: "Dashboard",        id: "dashboard" },
+                      { label: "Meal Planner",     id: "planner" },
+                      { label: "My Plans",         id: "my-plans" },
+                      { label: "Trainers",         id: "trainers" },
+                      { label: "My Bookings",      id: "my-bookings" },
+                      { label: "Account",          id: "account" },
+                      { label: "Subscription",     id: "subscription" },
+                      { label: "Guidelines",       id: "guidelines" },
                     ].map(item => (
-                      <button key={item.id} style={s.dropItem}
-                        onClick={() => navigate(item.id)}
+                      <button key={item.id} style={s.dropItem} onClick={() => navigate(item.id)}
                         onMouseEnter={e => e.target.style.background = "var(--bg-muted)"}
                         onMouseLeave={e => e.target.style.background = "none"}>
                         {item.label}
