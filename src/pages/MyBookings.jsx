@@ -27,9 +27,13 @@ function getNext14Days() {
 
 // ─── Calculate cancellation fee ───────────────────────────────────────────────
 function getCancellationFee(booking) {
-  const sessionDateTime = new Date(`${booking.dateIso}T${convertTo24(booking.time)}`);
-  const now             = new Date();
-  const hoursUntil      = (sessionDateTime - now) / (1000 * 60 * 60);
+  // Build session date+time carefully using local timezone
+  const [year, month, day] = booking.dateIso.split("-").map(Number);
+  const time24 = convertTo24(booking.time);
+  const [hours, minutes] = time24.split(":").map(Number);
+  const sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0);
+  const now = new Date();
+  const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
 
   if (hoursUntil >= 12) return { fee: 0,    pct: 0,   label: "Full refund",    color: "#15803d", refund: booking.price };
   if (hoursUntil >= 6)  return { fee: Math.round(booking.price * 0.10), pct: 10,  label: "10% cancellation fee", color: "#d97706", refund: Math.round(booking.price * 0.90) };
