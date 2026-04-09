@@ -1,7 +1,7 @@
 // ─── AI Configuration ────────────────────────────────────────────────────────
 export const API_URL = process.env.REACT_APP_API_URL || "https://meal-planner-backend-0ul2.onrender.com/api/meal-plan";
 export const MODEL = "claude-sonnet-4-6";
-export const MAX_TOKENS = 2500;
+export const MAX_TOKENS = 4000;
 
 // ─── Subscription Tiers ───────────────────────────────────────────────────────
 export const TIERS = {
