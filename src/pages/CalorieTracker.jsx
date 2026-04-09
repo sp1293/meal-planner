@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 
 const MEAL_TYPES = ["breakfast","lunch","dinner","snack"];
@@ -8,6 +8,10 @@ const MEAL_COLORS = {
   dinner:    { bg: "#eff6ff", border: "#bfdbfe", tag: "#1d4ed8" },
   snack:     { bg: "#fdf4ff", border: "#e9d5ff", tag: "#7c3aed" },
 };
+
+const API_BASE = process.env.REACT_APP_API_URL
+  ? process.env.REACT_APP_API_URL.replace("/api/meal-plan", "")
+  : "https://meal-planner-backend-0ul2.onrender.com";
 
 function getTodayKey() {
   return new Date().toISOString().split("T")[0];
@@ -29,16 +33,21 @@ function formatDate(iso) {
 export default function CalorieTracker({ navigate }) {
   const { profile } = useAuth();
   const STORAGE_KEY = `nourishai_calories_${profile?.uid || "guest"}`;
+  const photoRef    = useRef(null);
 
   const [data, setData] = useState(() => {
     try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : {}; }
     catch { return {}; }
   });
 
-  const [selectedDate, setSelectedDate] = useState(getTodayKey());
-  const [showAddForm,  setShowAddForm]  = useState(false);
-  const [addingTo,     setAddingTo]     = useState("breakfast");
-  const [form, setForm] = useState({ name: "", calories: "", protein: "", carbs: "", fat: "" });
+  const [selectedDate,  setSelectedDate]  = useState(getTodayKey());
+  const [showAddForm,   setShowAddForm]   = useState(false);
+  const [addingTo,      setAddingTo]      = useState("breakfast");
+  const [form,          setForm]          = useState({ name: "", calories: "", protein: "", carbs: "", fat: "" });
+  const [photoLoading,  setPhotoLoading]  = useState(false);
+  const [photoPreview,  setPhotoPreview]  = useState(null);
+  const [photoError,    setPhotoError]    = useState("");
+  const [photoResult,   setPhotoResult]   = useState(null); // detected items from AI
   const [calorieTarget, setCalorieTarget] = useState(() => {
     try { return parseInt(localStorage.getItem(`nourishai_cal_target_${profile?.uid}`) || "2000"); }
     catch { return 2000; }
@@ -51,7 +60,7 @@ export default function CalorieTracker({ navigate }) {
     catch {}
   }, [data, STORAGE_KEY]);
 
-  const dayData   = data[selectedDate] || {};
+  const dayData    = data[selectedDate] || {};
   const allEntries = MEAL_TYPES.flatMap(t => (dayData[t] || []).map(e => ({ ...e, mealType: t })));
   const totalCals  = allEntries.reduce((s, e) => s + (e.calories || 0), 0);
   const totalProt  = allEntries.reduce((s, e) => s + (e.protein  || 0), 0);
@@ -60,6 +69,98 @@ export default function CalorieTracker({ navigate }) {
   const pct        = Math.min(100, Math.round((totalCals / calorieTarget) * 100));
   const remaining  = calorieTarget - totalCals;
   const last7      = getLast7Days();
+
+  // ── Photo scan using Claude Vision ──────────────────────────────────────
+  async function handlePhotoScan(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { setPhotoError("Please upload an image."); return; }
+    if (file.size > 5 * 1024 * 1024) { setPhotoError("Image must be under 5MB."); return; }
+
+    setPhotoLoading(true);
+    setPhotoError("");
+    setPhotoResult(null);
+    setPhotoPreview(URL.createObjectURL(file));
+
+    try {
+      // Convert to base64
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result.split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch(`${API_BASE}/api/meal-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model:      "claude-sonnet-4-6",
+          max_tokens: 800,
+          messages: [{
+            role: "user",
+            content: [
+              {
+                type:   "image",
+                source: { type: "base64", media_type: file.type, data: base64 },
+              },
+              {
+                type: "text",
+                text: `You are a nutrition expert. Analyze this food photo and identify all food items visible.
+For each item, estimate calories and macros based on the visible portion size.
+Also give a total for the entire meal.
+
+Return ONLY valid JSON in this exact format, no other text:
+{
+  "items": [
+    { "name": "Food Item Name", "calories": 250, "protein": 8, "carbs": 35, "fat": 6, "portion": "1 cup approx" }
+  ],
+  "total": { "calories": 250, "protein": 8, "carbs": 35, "fat": 6 },
+  "mealName": "Short meal name e.g. Dal Rice Plate",
+  "confidence": "high/medium/low",
+  "notes": "Any important notes about the estimate"
+}
+
+Be realistic with Indian food portions. If you cannot identify the food clearly, set confidence to "low".`,
+              },
+            ],
+          }],
+        }),
+      });
+
+      const data     = await response.json();
+      const text     = data.content?.map(c => c.text || "").join("") || "";
+      const cleaned  = text.replace(/```json|```/g, "").trim();
+      const parsed   = JSON.parse(cleaned);
+
+      if (parsed?.total && parsed?.mealName) {
+        setPhotoResult(parsed);
+        // Auto-fill the form with detected values
+        setForm({
+          name:     parsed.mealName,
+          calories: String(parsed.total.calories),
+          protein:  String(parsed.total.protein),
+          carbs:    String(parsed.total.carbs),
+          fat:      String(parsed.total.fat),
+        });
+      } else {
+        setPhotoError("Couldn't analyze the food clearly. Please fill in manually.");
+      }
+    } catch {
+      setPhotoError("Failed to analyze photo. Please fill in manually.");
+    } finally {
+      setPhotoLoading(false);
+    }
+  }
+
+  function openAddForm(type) {
+    setAddingTo(type);
+    setShowAddForm(true);
+    setForm({ name: "", calories: "", protein: "", carbs: "", fat: "" });
+    setPhotoPreview(null);
+    setPhotoResult(null);
+    setPhotoError("");
+  }
 
   function addEntry() {
     if (!form.name || !form.calories) return;
@@ -71,6 +172,7 @@ export default function CalorieTracker({ navigate }) {
       carbs:    parseInt(form.carbs)    || 0,
       fat:      parseInt(form.fat)      || 0,
       time:     new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      fromPhoto: !!photoResult,
     };
     setData(prev => ({
       ...prev,
@@ -80,7 +182,30 @@ export default function CalorieTracker({ navigate }) {
       },
     }));
     setForm({ name: "", calories: "", protein: "", carbs: "", fat: "" });
+    setPhotoPreview(null);
+    setPhotoResult(null);
     setShowAddForm(false);
+  }
+
+  // Add individual detected item
+  function addDetectedItem(item) {
+    const entry = {
+      id:       Date.now().toString(),
+      name:     item.name,
+      calories: item.calories,
+      protein:  item.protein  || 0,
+      carbs:    item.carbs    || 0,
+      fat:      item.fat      || 0,
+      time:     new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
+      fromPhoto: true,
+    };
+    setData(prev => ({
+      ...prev,
+      [selectedDate]: {
+        ...prev[selectedDate],
+        [addingTo]: [...(prev[selectedDate]?.[addingTo] || []), entry],
+      },
+    }));
   }
 
   function removeEntry(mealType, id) {
@@ -102,7 +227,6 @@ export default function CalorieTracker({ navigate }) {
     setEditingTarget(false);
   }
 
-  // Weekly data for chart
   const weeklyData = last7.map(date => {
     const d = data[date] || {};
     return {
@@ -110,15 +234,16 @@ export default function CalorieTracker({ navigate }) {
       cals:  MEAL_TYPES.flatMap(t => d[t] || []).reduce((s, e) => s + (e.calories || 0), 0),
     };
   });
-  const maxCals = Math.max(...weeklyData.map(d => d.cals), calorieTarget);
-
+  const maxCals       = Math.max(...weeklyData.map(d => d.cals), calorieTarget);
   const progressColor = pct >= 100 ? "#ef4444" : pct >= 85 ? "#f59e0b" : "#16a34a";
+
+  const confidenceColor = { high: "#15803d", medium: "#d97706", low: "#dc2626" };
 
   return (
     <div className="page">
       <div className="page-title anim-fade-up">
         <h1>🔥 Calorie Tracker</h1>
-        <p>Log your daily meals and track calories against your target</p>
+        <p>Log meals manually or just snap a photo — AI estimates the calories instantly</p>
       </div>
 
       {/* Date selector */}
@@ -137,12 +262,8 @@ export default function CalorieTracker({ navigate }) {
       <div className="card anim-fade-up-2" style={{ marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
           <div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 2 }}>
-              {formatDate(selectedDate)}
-            </div>
-            <div style={{ fontSize: 13, color: "var(--text-3)" }}>
-              {selectedDate === getTodayKey() ? "Today" : ""}
-            </div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 2 }}>{formatDate(selectedDate)}</div>
+            <div style={{ fontSize: 13, color: "var(--text-3)" }}>{selectedDate === getTodayKey() ? "Today" : ""}</div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {editingTarget ? (
@@ -162,15 +283,13 @@ export default function CalorieTracker({ navigate }) {
 
         {/* Calorie ring + stats */}
         <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, alignItems: "center", marginBottom: 16 }}>
-          {/* Progress circle */}
           <div style={{ position: "relative", width: 120, height: 120 }}>
             <svg width="120" height="120" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="10" />
               <circle cx="60" cy="60" r="50" fill="none" stroke={progressColor} strokeWidth="10"
                 strokeDasharray={`${2 * Math.PI * 50}`}
                 strokeDashoffset={`${2 * Math.PI * 50 * (1 - pct / 100)}`}
-                strokeLinecap="round"
-                transform="rotate(-90 60 60)"
+                strokeLinecap="round" transform="rotate(-90 60 60)"
                 style={{ transition: "stroke-dashoffset 0.6s ease" }} />
             </svg>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
@@ -178,8 +297,6 @@ export default function CalorieTracker({ navigate }) {
               <div style={{ fontSize: 10, color: "var(--text-4)" }}>kcal eaten</div>
             </div>
           </div>
-
-          {/* Stats */}
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 14 }}>
               <span style={{ color: "var(--text-3)" }}>Eaten</span>
@@ -194,7 +311,6 @@ export default function CalorieTracker({ navigate }) {
                 {remaining >= 0 ? `${remaining} remaining` : `${Math.abs(remaining)} over`}
               </span>
             </div>
-            {/* Macros */}
             <div style={{ display: "flex", gap: 12 }}>
               {[["Protein", totalProt, "#3b82f6"],["Carbs", totalCarbs, "#f59e0b"],["Fat", totalFat, "#ef4444"]].map(([label, val, color]) => (
                 <div key={label} style={{ flex: 1, background: "var(--bg-muted)", borderRadius: "var(--radius-sm)", padding: "8px 10px", textAlign: "center" }}>
@@ -207,16 +323,21 @@ export default function CalorieTracker({ navigate }) {
         </div>
       </div>
 
-      {/* Add meal button */}
+      {/* Add meal buttons */}
       {!showAddForm && (
         <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }} className="anim-fade-up-2">
           {MEAL_TYPES.map(type => (
             <button key={type} className="btn btn-ghost btn-sm"
-              onClick={() => { setAddingTo(type); setShowAddForm(true); setForm({ name: "", calories: "", protein: "", carbs: "", fat: "" }); }}
-              style={{ fontSize: 13 }}>
+              onClick={() => openAddForm(type)} style={{ fontSize: 13 }}>
               + Add {type}
             </button>
           ))}
+          {/* Quick photo scan button */}
+          <button className="btn btn-primary btn-sm"
+            onClick={() => { openAddForm("snack"); setTimeout(() => photoRef.current?.click(), 100); }}
+            style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 6 }}>
+            📸 Scan Food Photo
+          </button>
         </div>
       )}
 
@@ -231,7 +352,7 @@ export default function CalorieTracker({ navigate }) {
           </div>
 
           {/* Meal type selector */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
             {MEAL_TYPES.map(t => (
               <button key={t} type="button" onClick={() => setAddingTo(t)}
                 style={{ padding: "6px 12px", borderRadius: "var(--radius-full)", border: `1.5px solid ${addingTo === t ? "var(--primary)" : "var(--border)"}`, background: addingTo === t ? "var(--primary-pale)" : "#fff", color: addingTo === t ? "var(--primary-dark)" : "var(--text-3)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)", fontWeight: addingTo === t ? 600 : 400 }}>
@@ -240,31 +361,133 @@ export default function CalorieTracker({ navigate }) {
             ))}
           </div>
 
+          {/* ── Photo Scan Section ── */}
+          <div style={{ background: "var(--bg-muted)", borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", marginBottom: 2 }}>📸 Scan with AI</div>
+                <div style={{ fontSize: 12, color: "var(--text-3)" }}>Take a photo of your meal — AI estimates calories instantly</div>
+              </div>
+              <button className="btn btn-primary btn-sm" onClick={() => photoRef.current?.click()} disabled={photoLoading}
+                style={{ flexShrink: 0 }}>
+                {photoLoading ? <><span className="spin">⟳</span> Scanning...</> : "📷 Take Photo"}
+              </button>
+            </div>
+            <input ref={photoRef} type="file" accept="image/*" capture="environment"
+              onChange={handlePhotoScan} style={{ display: "none" }} />
+
+            {/* Photo preview */}
+            {photoPreview && (
+              <div style={{ marginBottom: 12 }}>
+                <img src={photoPreview} alt="Food" style={{ width: "100%", maxHeight: 200, objectFit: "cover", borderRadius: "var(--radius-sm)" }} />
+              </div>
+            )}
+
+            {/* Loading */}
+            {photoLoading && (
+              <div style={{ textAlign: "center", padding: "16px 0" }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>🤖</div>
+                <p style={{ fontSize: 13, color: "var(--text-3)" }}>AI is analyzing your food photo...</p>
+              </div>
+            )}
+
+            {/* Photo error */}
+            {photoError && <div className="banner banner-error" style={{ marginTop: 8 }}>{photoError}</div>}
+
+            {/* AI Results */}
+            {photoResult && !photoLoading && (
+              <div className="anim-fade-in">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)" }}>
+                    🤖 AI detected: {photoResult.mealName}
+                  </div>
+                  <span style={{ fontSize: 11, background: confidenceColor[photoResult.confidence] + "22", color: confidenceColor[photoResult.confidence], padding: "2px 10px", borderRadius: "var(--radius-full)", fontWeight: 700, textTransform: "capitalize" }}>
+                    {photoResult.confidence} confidence
+                  </span>
+                </div>
+
+                {/* Individual items */}
+                {photoResult.items?.length > 1 && (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 8 }}>Detected items — tap to add individually:</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {photoResult.items.map((item, i) => (
+                        <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#fff", borderRadius: "var(--radius-sm)", padding: "8px 12px", border: "1px solid var(--border)" }}>
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{item.name}</div>
+                            <div style={{ fontSize: 11, color: "var(--text-4)" }}>{item.portion} · P:{item.protein}g C:{item.carbs}g F:{item.fat}g</div>
+                          </div>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: "var(--primary-dark)" }}>{item.calories} kcal</span>
+                            <button className="btn btn-ghost btn-sm" onClick={() => addDetectedItem(item)} style={{ fontSize: 11 }}>+ Add</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Total summary */}
+                <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--primary-dark)" }}>Total meal estimate</div>
+                    <div style={{ fontSize: 12, color: "var(--primary)", marginTop: 2 }}>
+                      P:{photoResult.total.protein}g · C:{photoResult.total.carbs}g · F:{photoResult.total.fat}g
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "var(--primary-dark)", fontFamily: "var(--font-display)" }}>
+                    {photoResult.total.calories} kcal
+                  </div>
+                </div>
+
+                {photoResult.notes && (
+                  <div style={{ fontSize: 12, color: "var(--text-4)", marginTop: 8, fontStyle: "italic" }}>
+                    ℹ️ {photoResult.notes}
+                  </div>
+                )}
+
+                <p style={{ fontSize: 11, color: "var(--text-4)", marginTop: 8 }}>
+                  ⚠️ AI estimates may vary. You can edit the values below before saving.
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Manual form — pre-filled from photo or blank */}
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-3)", marginBottom: 12, textTransform: "uppercase", letterSpacing: ".5px" }}>
+            {photoResult ? "Edit & Confirm" : "Or enter manually"}
+          </div>
           <div className="grid-2" style={{ marginBottom: 12 }}>
             <div className="form-group" style={{ gridColumn: "1 / -1" }}>
               <label>Food name *</label>
-              <input className="form-control" type="text" placeholder="e.g. Poha, Dal Rice, Apple..." value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} autoFocus maxLength={80} />
+              <input className="form-control" type="text" placeholder="e.g. Poha, Dal Rice, Apple..."
+                value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                maxLength={80} />
             </div>
             <div className="form-group">
               <label>Calories (kcal) *</label>
-              <input className="form-control" type="number" placeholder="e.g. 350" min="0" max="5000" value={form.calories} onChange={e => setForm(f => ({ ...f, calories: e.target.value }))} />
+              <input className="form-control" type="number" placeholder="e.g. 350" min="0" max="5000"
+                value={form.calories} onChange={e => setForm(f => ({ ...f, calories: e.target.value }))} />
             </div>
             <div className="form-group">
               <label>Protein (g) <span style={{ color: "var(--text-4)", fontWeight: 400 }}>optional</span></label>
-              <input className="form-control" type="number" placeholder="e.g. 12" min="0" max="500" value={form.protein} onChange={e => setForm(f => ({ ...f, protein: e.target.value }))} />
+              <input className="form-control" type="number" placeholder="e.g. 12" min="0" max="500"
+                value={form.protein} onChange={e => setForm(f => ({ ...f, protein: e.target.value }))} />
             </div>
             <div className="form-group">
               <label>Carbs (g) <span style={{ color: "var(--text-4)", fontWeight: 400 }}>optional</span></label>
-              <input className="form-control" type="number" placeholder="e.g. 55" min="0" max="1000" value={form.carbs} onChange={e => setForm(f => ({ ...f, carbs: e.target.value }))} />
+              <input className="form-control" type="number" placeholder="e.g. 55" min="0" max="1000"
+                value={form.carbs} onChange={e => setForm(f => ({ ...f, carbs: e.target.value }))} />
             </div>
             <div className="form-group">
               <label>Fat (g) <span style={{ color: "var(--text-4)", fontWeight: 400 }}>optional</span></label>
-              <input className="form-control" type="number" placeholder="e.g. 8" min="0" max="500" value={form.fat} onChange={e => setForm(f => ({ ...f, fat: e.target.value }))} />
+              <input className="form-control" type="number" placeholder="e.g. 8" min="0" max="500"
+                value={form.fat} onChange={e => setForm(f => ({ ...f, fat: e.target.value }))} />
             </div>
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <button className="btn btn-primary" onClick={addEntry} disabled={!form.name || !form.calories}>
-              Add Entry
+              {photoResult ? "✅ Save AI Entry" : "Add Entry"}
             </button>
             <button className="btn btn-ghost" onClick={() => setShowAddForm(false)}>Cancel</button>
           </div>
@@ -274,8 +497,8 @@ export default function CalorieTracker({ navigate }) {
       {/* Meal logs */}
       <div className="anim-fade-up-3" style={{ marginBottom: 28 }}>
         {MEAL_TYPES.map(type => {
-          const entries = dayData[type] || [];
-          const c = MEAL_COLORS[type];
+          const entries  = dayData[type] || [];
+          const c        = MEAL_COLORS[type];
           const mealCals = entries.reduce((s, e) => s + (e.calories || 0), 0);
           return (
             <div key={type} style={{ marginBottom: 14 }}>
@@ -288,7 +511,7 @@ export default function CalorieTracker({ navigate }) {
               </div>
               {entries.length === 0 ? (
                 <div style={{ padding: "12px 16px", background: c.bg, border: `1px dashed ${c.border}`, borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--text-4)", cursor: "pointer" }}
-                  onClick={() => { setAddingTo(type); setShowAddForm(true); setForm({ name: "", calories: "", protein: "", carbs: "", fat: "" }); }}>
+                  onClick={() => openAddForm(type)}>
                   + Tap to log {type}
                 </div>
               ) : (
@@ -296,7 +519,10 @@ export default function CalorieTracker({ navigate }) {
                   {entries.map(entry => (
                     <div key={entry.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: c.bg, border: `1px solid ${c.border}`, borderRadius: "var(--radius-sm)", padding: "10px 14px" }}>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{entry.name}</div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{entry.name}</span>
+                          {entry.fromPhoto && <span style={{ fontSize: 10, background: "#eff6ff", color: "#1d4ed8", padding: "1px 6px", borderRadius: "var(--radius-full)", fontWeight: 700 }}>📸 AI</span>}
+                        </div>
                         <div style={{ fontSize: 12, color: "var(--text-4)", marginTop: 2 }}>
                           {entry.time}
                           {entry.protein > 0 && ` · P:${entry.protein}g`}
@@ -332,9 +558,7 @@ export default function CalorieTracker({ navigate }) {
               <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                 <div style={{ fontSize: 10, color: "var(--text-4)" }}>{d.cals > 0 ? d.cals : ""}</div>
                 <div style={{ width: "100%", height: 120, display: "flex", alignItems: "flex-end", position: "relative" }}>
-                  {/* Target line */}
                   <div style={{ position: "absolute", left: 0, right: 0, bottom: targetH, borderTop: "1.5px dashed #d1d5db", zIndex: 1 }} />
-                  {/* Bar */}
                   <div style={{ width: "100%", height: barH || 3, background: over ? "#ef4444" : isToday ? "var(--primary)" : "#a7f3d0", borderRadius: "3px 3px 0 0", transition: "height 0.4s ease", position: "relative", zIndex: 2 }} />
                 </div>
                 <div style={{ fontSize: 11, color: isToday ? "var(--primary)" : "var(--text-4)", fontWeight: isToday ? 700 : 400 }}>{d.label}</div>
