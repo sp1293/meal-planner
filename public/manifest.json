@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "NourishAI",
+  "name": "NourishAI — AI Indian Meal Planner",
+  "description": "Personalized Indian meal plans, calorie tracking and trainer booking powered by AI",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,16 +11,32 @@
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192"
+      "sizes": "192x192",
+      "purpose": "any maskable"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512"
+      "sizes": "512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "orientation": "portrait",
+  "theme_color": "#166534",
+  "background_color": "#f9fafb",
+  "categories": ["health", "food", "fitness"],
+  "lang": "en-IN",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Meal Planner"
+    }
+  ]
 }

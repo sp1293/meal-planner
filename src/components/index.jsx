@@ -2,6 +2,7 @@ import { useAuth } from "../context/AuthContext";
 import { TIERS, AGE_GROUPS } from "../config";
 
 /* ─── Footer ─────────────────────────────────────────────────────────────────── */
+
 export function Footer({ navigate }) {
   return (
     <footer style={{ background: "var(--primary-dark)", color: "#fff", padding: "48px 24px 24px" }}>
@@ -9,26 +10,75 @@ export function Footer({ navigate }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 32, marginBottom: 40 }}>
           <div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, marginBottom: 10 }}>🥗 NourishAI</div>
-            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>AI-powered meal planning for every age group and dietary need.</p>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
+              AI-powered meal planning for every age group and dietary need.
+            </p>
           </div>
           {[
-            { title: "Product", links: [["Meal Planner","planner"],["My Plans","my-plans"],["Pricing","subscription"],["🍳 Leftover Chef", "leftover-chef"]] },
-            { title: "Account", links: [["Sign Up","signup"],["Sign In","login"],["Account Settings","account"]] },
+            {
+              title: "Product",
+              links: [
+                ["Meal Planner",     "planner"],
+                ["My Plans",         "my-plans"],
+                ["Trainers",         "trainers"],
+                ["🍳 Leftover Chef", "leftover-chef"],
+                ["🎁 Refer & Earn",  "referral"],
+                ["Pricing",          "subscription"],
+              ],
+            },
+            {
+              title: "Tools",
+              links: [
+                ["🔥 Calorie Tracker", "calories"],
+                ["🎯 Goal Tracker",    "goals"],
+                ["My Bookings",        "my-bookings"],
+                ["Account Settings",   "account"],
+              ],
+            },
+            {
+              title: "Legal & Help",
+              links: [
+                ["Platform Guidelines", "guidelines"],
+                ["Privacy Policy",      "privacy"],
+                ["Terms of Service",    "terms"],
+                ["Contact Support",     "mailto:support@nourishai.com"],
+              ],
+            },
           ].map(col => (
             <div key={col.title}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.5)", marginBottom: 14 }}>{col.title}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".8px", color: "rgba(255,255,255,0.5)", marginBottom: 14 }}>
+                {col.title}
+              </div>
               {col.links.map(([label, id]) => (
-                <button key={id} onClick={() => navigate && navigate(id)}
-                  style={{ display: "block", background: "none", border: "none", color: "rgba(255,255,255,0.75)", fontSize: 14, marginBottom: 10, cursor: "pointer", padding: 0, textAlign: "left" }}>
-                  {label}
-                </button>
+                id.startsWith("mailto:") ? (
+                  <a key={id} href={id}
+                    style={{ display: "block", color: "rgba(255,255,255,0.75)", fontSize: 14, marginBottom: 10, textDecoration: "none" }}>
+                    {label}
+                  </a>
+                ) : (
+                  <button key={id} onClick={() => navigate && navigate(id)}
+                    style={{ display: "block", background: "none", border: "none", color: "rgba(255,255,255,0.75)", fontSize: 14, marginBottom: 10, cursor: "pointer", padding: 0, textAlign: "left", fontFamily: "var(--font-body)" }}>
+                    {label}
+                  </button>
+                )
               ))}
             </div>
           ))}
         </div>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>© {new Date().getFullYear()} NourishAI. All rights reserved.</p>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Powered by Claude Opus · Built with ❤️</p>
+
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
+            © {new Date().getFullYear()} NourishAI. All rights reserved. · Bengaluru, India
+          </p>
+          <div style={{ display: "flex", gap: 16 }}>
+            {[["Privacy Policy","privacy"],["Terms of Service","terms"],["Guidelines","guidelines"]].map(([label, id]) => (
+              <button key={id} onClick={() => navigate && navigate(id)}
+                style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)", padding: 0 }}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Powered by Claude · Built with ❤️</p>
         </div>
       </div>
     </footer>
