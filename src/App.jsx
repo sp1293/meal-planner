@@ -4,6 +4,8 @@ import "./styles/global.css";
 import CalorieTracker from "./pages/CalorieTracker";
 import GoalTracker    from "./pages/GoalTracker";
 
+import LeftoverChef from "./pages/LeftoverChef";
+
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SubProvider } from "./context/SubContext";
 
@@ -90,6 +92,8 @@ function InnerApp() {
   return <ProtectedRoute navigate={navigate}><CalorieTracker navigate={navigate} /></ProtectedRoute>;
 case "goals":
   return <ProtectedRoute navigate={navigate}><GoalTracker navigate={navigate} /></ProtectedRoute>;  
+  case "leftover-chef":
+  return <ProtectedRoute navigate={navigate}><LeftoverChef navigate={navigate} /></ProtectedRoute>;
       default:
         return <Landing navigate={navigate} />;
     }

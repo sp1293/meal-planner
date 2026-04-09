@@ -25,20 +25,17 @@ function getNext14Days() {
   return days;
 }
 
-// ─── Calculate cancellation fee ───────────────────────────────────────────────
 function getCancellationFee(booking) {
-  // Build session date+time carefully using local timezone
   const [year, month, day] = booking.dateIso.split("-").map(Number);
   const time24 = convertTo24(booking.time);
   const [hours, minutes] = time24.split(":").map(Number);
   const sessionDateTime = new Date(year, month - 1, day, hours, minutes, 0);
   const now = new Date();
   const hoursUntil = (sessionDateTime - now) / (1000 * 60 * 60);
-
-  if (hoursUntil >= 12) return { fee: 0,    pct: 0,   label: "Full refund",    color: "#15803d", refund: booking.price };
-  if (hoursUntil >= 6)  return { fee: Math.round(booking.price * 0.10), pct: 10,  label: "10% cancellation fee", color: "#d97706", refund: Math.round(booking.price * 0.90) };
-  if (hoursUntil >= 1)  return { fee: Math.round(booking.price * 0.20), pct: 20,  label: "20% cancellation fee", color: "#ea580c", refund: Math.round(booking.price * 0.80) };
-  return                       { fee: Math.round(booking.price * 0.50), pct: 50,  label: "50% cancellation fee", color: "#dc2626", refund: Math.round(booking.price * 0.50) };
+  if (hoursUntil >= 12) return { fee: 0, pct: 0, label: "Full refund", color: "#15803d", refund: booking.price };
+  if (hoursUntil >= 6)  return { fee: Math.round(booking.price * 0.10), pct: 10, label: "10% cancellation fee", color: "#d97706", refund: Math.round(booking.price * 0.90) };
+  if (hoursUntil >= 1)  return { fee: Math.round(booking.price * 0.20), pct: 20, label: "20% cancellation fee", color: "#ea580c", refund: Math.round(booking.price * 0.80) };
+  return { fee: Math.round(booking.price * 0.50), pct: 50, label: "50% cancellation fee", color: "#dc2626", refund: Math.round(booking.price * 0.50) };
 }
 
 function convertTo24(time12) {
@@ -49,9 +46,73 @@ function convertTo24(time12) {
   return `${hours}:${minutes || "00"}:00`;
 }
 
+// ── Generate .ics calendar file ────────────────────────────────────────────
+function downloadCalendar(booking) {
+  const [year, month, day] = booking.dateIso.split("-").map(Number);
+  const time24  = convertTo24(booking.time);
+  const [h, m]  = time24.split(":").map(Number);
+
+  function pad(n) { return String(n).padStart(2, "0"); }
+
+  const startDt = `${year}${pad(month)}${pad(day)}T${pad(h)}${pad(m)}00`;
+  const endH    = h + 1;
+  const endDt   = `${year}${pad(month)}${pad(day)}T${pad(endH)}${pad(m)}00`;
+  const now     = new Date().toISOString().replace(/[-:]/g,"").split(".")[0] + "Z";
+
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//NourishAI//Session Booking//EN",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:${booking.id}@nourishai`,
+    `DTSTAMP:${now}`,
+    `DTSTART:${startDt}`,
+    `DTEND:${endDt}`,
+    `SUMMARY:NourishAI Session - ${booking.trainerName}`,
+    `DESCRIPTION:${booking.sessionType} session with ${booking.trainerName} (${booking.speciality}).\\nBooked via NourishAI.\\nDo not share personal contact outside the platform.`,
+    `LOCATION:${booking.sessionType === "Video call" ? "Online - link will be shared by trainer" : "In-Person - location shared by trainer"}`,
+    "BEGIN:VALARM",
+    "TRIGGER:-PT1H",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:Reminder: Session with ${booking.trainerName} in 1 hour`,
+    "END:VALARM",
+    "BEGIN:VALARM",
+    "TRIGGER:-PT1D",
+    "ACTION:DISPLAY",
+    `DESCRIPTION:Reminder: Session with ${booking.trainerName} tomorrow at ${booking.time}`,
+    "END:VALARM",
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+
+  const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href     = url;
+  a.download = `nourishai-session-${booking.trainerName.replace(/\s/g,"-")}.ics`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Star Rating Component ──────────────────────────────────────────────────
+function StarRating({ value, onChange, readonly }) {
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {[1,2,3,4,5].map(star => (
+        <button key={star} type="button" onClick={() => !readonly && onChange && onChange(star)}
+          style={{ background: "none", border: "none", fontSize: 28, cursor: readonly ? "default" : "pointer", color: star <= value ? "#f59e0b" : "#d1d5db", padding: 2, transition: "color 0.15s" }}>
+          ★
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function MyBookings({ navigate }) {
   const { profile } = useAuth();
-  const STORAGE_KEY  = `nourishai_bookings_${profile?.uid || "guest"}`;
+  const STORAGE_KEY = `nourishai_bookings_${profile?.uid || "guest"}`;
 
   const [myBookings, setMyBookings] = useState(() => {
     try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : []; }
@@ -71,15 +132,21 @@ export default function MyBookings({ navigate }) {
   const [notes,           setNotes]           = useState("");
   const [showSuccess,     setShowSuccess]     = useState(false);
   const [lastBooked,      setLastBooked]      = useState(null);
+  const [calDownloaded,   setCalDownloaded]   = useState(false);
 
-  // Manage booking state
-  const [managingId,     setManagingId]     = useState(null);
-  const [manageAction,   setManageAction]   = useState(""); // "reschedule" | "cancel"
-  const [newDate,        setNewDate]        = useState(null);
-  const [newTime,        setNewTime]        = useState("");
-  const [showCancelConf, setShowCancelConf] = useState(false);
+  // Manage state
+  const [managingId,   setManagingId]   = useState(null);
+  const [manageAction, setManageAction] = useState("");
+  const [newDate,      setNewDate]      = useState(null);
+  const [newTime,      setNewTime]      = useState("");
 
-  const availableDates = getNext14Days();
+  // Review state
+  const [reviewingId,    setReviewingId]    = useState(null);
+  const [reviewRating,   setReviewRating]   = useState(0);
+  const [reviewComment,  setReviewComment]  = useState("");
+  const [reviewSubmitted,setReviewSubmitted]= useState(false);
+
+  const availableDates  = getNext14Days();
 
   function getTrainerDates(trainer) {
     return availableDates.filter(d =>
@@ -115,22 +182,21 @@ export default function MyBookings({ navigate }) {
       notes,
       status:        "Confirmed",
       bookedAt:      new Date().toLocaleString("en-IN"),
+      review:        null,
     };
     setMyBookings(prev => [booking, ...prev]);
     setLastBooked(booking);
     setShowSuccess(true);
+    setCalDownloaded(false);
     setStep("list");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ─── Reschedule ─────────────────────────────────────────────────────────────
   function openManage(booking, action) {
     setManagingId(booking.id);
     setManageAction(action);
     setNewDate(null);
     setNewTime("");
-    if (action === "cancel") setShowCancelConf(true);
-    else setShowCancelConf(false);
   }
 
   function handleReschedule() {
@@ -141,23 +207,41 @@ export default function MyBookings({ navigate }) {
         : b
     ));
     setManagingId(null); setManageAction("");
-    setShowSuccess(true);
     setLastBooked({ ...myBookings.find(b => b.id === managingId), dateLabel: newDate.label, time: newTime });
+    setShowSuccess(true);
   }
 
   function handleCancel() {
     setMyBookings(prev => prev.map(b =>
       b.id === managingId ? { ...b, status: "Cancelled" } : b
     ));
-    setManagingId(null); setManageAction(""); setShowCancelConf(false);
+    setManagingId(null); setManageAction("");
+  }
+
+  function submitReview() {
+    if (!reviewRating) return;
+    setMyBookings(prev => prev.map(b =>
+      b.id === reviewingId
+        ? { ...b, review: { rating: reviewRating, comment: reviewComment, submittedAt: new Date().toLocaleString("en-IN") } }
+        : b
+    ));
+    setReviewSubmitted(true);
+    setTimeout(() => {
+      setReviewingId(null);
+      setReviewRating(0);
+      setReviewComment("");
+      setReviewSubmitted(false);
+    }, 2000);
   }
 
   const managingBooking = myBookings.find(b => b.id === managingId);
   const managingTrainer = managingBooking ? TRAINERS_DATA.find(t => t.id === managingBooking.trainerId) : null;
   const cancelFee       = managingBooking ? getCancellationFee(managingBooking) : null;
+  const reviewingBooking = myBookings.find(b => b.id === reviewingId);
 
   const activeBookings    = myBookings.filter(b => b.status !== "Cancelled");
   const cancelledBookings = myBookings.filter(b => b.status === "Cancelled");
+  const completedBookings = myBookings.filter(b => b.status === "Completed");
 
   return (
     <div className="page">
@@ -166,7 +250,7 @@ export default function MyBookings({ navigate }) {
         <p>Manage your trainer sessions and schedule</p>
       </div>
 
-      {/* Success banner */}
+      {/* Success banner with calendar download */}
       {showSuccess && lastBooked && (
         <div style={{ background: "#f0fdf4", border: "1.5px solid #86efac", borderRadius: "var(--radius-md)", padding: 20, marginBottom: 24 }} className="anim-scale-in">
           <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
@@ -175,12 +259,19 @@ export default function MyBookings({ navigate }) {
               <div style={{ fontWeight: 700, fontSize: 16, color: "#14532d", marginBottom: 6 }}>
                 {manageAction === "reschedule" ? "Session Rescheduled!" : "Session Booked Successfully!"}
               </div>
-              <div style={{ fontSize: 14, color: "#15803d", marginBottom: 10, lineHeight: 1.6 }}>
+              <div style={{ fontSize: 14, color: "#15803d", marginBottom: 12, lineHeight: 1.6 }}>
                 Your session with <strong>{lastBooked.trainerName}</strong> on{" "}
                 <strong>{lastBooked.dateLabel}</strong> at <strong>{lastBooked.time}</strong> is confirmed.
               </div>
-              <div style={{ background: "#dcfce7", borderRadius: "var(--radius-sm)", padding: "10px 14px", fontSize: 13, color: "#14532d" }}>
-                📧 Confirmation sent to <strong>{profile?.email}</strong>. Your trainer will reach out within 24 hours.
+              {/* Calendar download */}
+              <div style={{ background: "#dcfce7", borderRadius: "var(--radius-sm)", padding: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: "#14532d" }}>
+                  📅 Add this session to your calendar so you don't forget!
+                </span>
+                <button onClick={() => { downloadCalendar(lastBooked); setCalDownloaded(true); }}
+                  style={{ padding: "7px 16px", background: calDownloaded ? "#15803d" : "#fff", color: calDownloaded ? "#fff" : "#15803d", border: "1.5px solid #15803d", borderRadius: "var(--radius-sm)", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-body)", transition: "all 0.2s" }}>
+                  {calDownloaded ? "✅ Added!" : "📥 Add to Calendar"}
+                </button>
               </div>
             </div>
             <button onClick={() => { setShowSuccess(false); setManageAction(""); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#15803d", fontSize: 20 }}>✕</button>
@@ -188,18 +279,16 @@ export default function MyBookings({ navigate }) {
         </div>
       )}
 
-      {/* ── Manage Modal ── */}
-      {managingId && managingBooking && (
-        <div onClick={() => setManagingId(null)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      {/* ── Manage / Review Modal ── */}
+      {(managingId || reviewingId) && (
+        <div onClick={() => { setManagingId(null); setReviewingId(null); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 999, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-card)", borderRadius: "var(--radius-lg)", padding: 28, maxWidth: 540, width: "100%", maxHeight: "90vh", overflowY: "auto" }}>
 
-            {/* Cancel confirmation */}
-            {manageAction === "cancel" && (
+            {/* Cancel */}
+            {manageAction === "cancel" && managingBooking && (
               <>
                 <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 6 }}>Cancel Session</h2>
                 <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>with {managingBooking.trainerName} · {managingBooking.dateLabel} at {managingBooking.time}</p>
-
-                {/* Cancellation fee display */}
                 <div style={{ background: cancelFee?.pct === 0 ? "#f0fdf4" : "#fff8e1", border: `1px solid ${cancelFee?.pct === 0 ? "#86efac" : "#fde68a"}`, borderRadius: "var(--radius-md)", padding: 16, marginBottom: 20 }}>
                   <div style={{ fontWeight: 700, fontSize: 15, color: cancelFee?.color, marginBottom: 10 }}>
                     {cancelFee?.pct === 0 ? "✅" : "⚠️"} {cancelFee?.label}
@@ -219,34 +308,27 @@ export default function MyBookings({ navigate }) {
                     <span style={{ fontWeight: 700, color: cancelFee?.color }}>₹{cancelFee?.refund}</span>
                   </div>
                 </div>
-
                 <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 20, fontSize: 13, color: "#991b1b" }}>
-                  ⚠️ Cancellation fee policy: 12+ hrs = full refund · 6-12 hrs = 10% fee · 1-6 hrs = 20% fee · &lt;1 hr = 50% fee
+                  ⚠️ Cancellation policy: 12+ hrs = full refund · 6-12 hrs = 10% fee · 1-6 hrs = 20% fee · &lt;1 hr = 50% fee
                 </div>
-
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleCancel}>
-                    Confirm Cancellation
-                  </button>
-                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setManagingId(null)}>
-                    Keep Booking
-                  </button>
+                  <button className="btn btn-danger" style={{ flex: 1 }} onClick={handleCancel}>Confirm Cancellation</button>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setManagingId(null)}>Keep Booking</button>
                 </div>
               </>
             )}
 
             {/* Reschedule */}
-            {manageAction === "reschedule" && managingTrainer && (
+            {manageAction === "reschedule" && managingBooking && managingTrainer && (
               <>
                 <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 6 }}>Reschedule Session</h2>
                 <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>with {managingBooking.trainerName} · currently {managingBooking.dateLabel} at {managingBooking.time}</p>
-
                 <div className="form-group">
                   <label>New Date</label>
                   <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
                     {getTrainerDates(managingTrainer).map(d => (
                       <button key={d.iso} type="button" onClick={() => setNewDate(d)}
-                        style={{ flexShrink: 0, padding: "10px 14px", borderRadius: "var(--radius-md)", border: `1.5px solid ${newDate?.iso === d.iso ? "var(--primary)" : "var(--border)"}`, background: newDate?.iso === d.iso ? "var(--primary)" : "#fff", color: newDate?.iso === d.iso ? "#fff" : "var(--text)", cursor: "pointer", fontFamily: "var(--font-body)", textAlign: "center", transition: "var(--transition)", minWidth: 64 }}>
+                        style={{ flexShrink: 0, padding: "10px 14px", borderRadius: "var(--radius-md)", border: `1.5px solid ${newDate?.iso === d.iso ? "var(--primary)" : "var(--border)"}`, background: newDate?.iso === d.iso ? "var(--primary)" : "#fff", color: newDate?.iso === d.iso ? "#fff" : "var(--text)", cursor: "pointer", textAlign: "center", minWidth: 64, fontFamily: "var(--font-body)" }}>
                         <div style={{ fontSize: 11, opacity: 0.8, marginBottom: 2 }}>{d.shortDay}</div>
                         <div style={{ fontSize: 18, fontWeight: 700 }}>{d.date}</div>
                         <div style={{ fontSize: 10, opacity: 0.8 }}>{d.month}</div>
@@ -255,32 +337,91 @@ export default function MyBookings({ navigate }) {
                   </div>
                   {newDate && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 6 }}>✓ {newDate.label} selected</p>}
                 </div>
-
                 <div className="form-group">
                   <label>New Time Slot</label>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
                     {TIME_SLOTS.map(t => (
                       <button key={t} type="button" onClick={() => setNewTime(t)}
-                        style={{ padding: "10px 6px", borderRadius: "var(--radius-sm)", border: `1.5px solid ${newTime === t ? "var(--primary)" : "var(--border)"}`, background: newTime === t ? "var(--primary)" : "#fff", color: newTime === t ? "#fff" : "var(--text-3)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)", transition: "var(--transition)" }}>
+                        style={{ padding: "10px 6px", borderRadius: "var(--radius-sm)", border: `1.5px solid ${newTime === t ? "var(--primary)" : "var(--border)"}`, background: newTime === t ? "var(--primary)" : "#fff", color: newTime === t ? "#fff" : "var(--text-3)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" }}>
                         {t}
                       </button>
                     ))}
                   </div>
                   {newTime && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 6 }}>✓ {newTime} selected</p>}
                 </div>
-
                 <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)" }}>
-                  ℹ️ Rescheduling is free if done 12+ hours before your session. No extra charge applies.
+                  ℹ️ Rescheduling is free if done 12+ hours before your session.
                 </div>
-
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleReschedule} disabled={!newDate || !newTime}>
-                    Confirm Reschedule
-                  </button>
-                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setManagingId(null)}>
-                    Cancel
-                  </button>
+                  <button className="btn btn-primary" style={{ flex: 1 }} onClick={handleReschedule} disabled={!newDate || !newTime}>Confirm Reschedule</button>
+                  <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setManagingId(null)}>Cancel</button>
                 </div>
+              </>
+            )}
+
+            {/* Review modal */}
+            {reviewingId && reviewingBooking && (
+              <>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 6 }}>
+                  ⭐ Rate Your Session
+                </h2>
+                <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>
+                  with {reviewingBooking.trainerName} · {reviewingBooking.dateLabel}
+                </p>
+
+                {reviewSubmitted ? (
+                  <div style={{ textAlign: "center", padding: 32 }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                    <div style={{ fontWeight: 700, fontSize: 18, color: "var(--primary-dark)" }}>Review Submitted!</div>
+                    <p style={{ color: "var(--text-3)", marginTop: 8 }}>Thank you for your feedback.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Existing review */}
+                    {reviewingBooking.review ? (
+                      <div>
+                        <div style={{ marginBottom: 16 }}>
+                          <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 8 }}>Your rating:</div>
+                          <StarRating value={reviewingBooking.review.rating} readonly />
+                        </div>
+                        {reviewingBooking.review.comment && (
+                          <div style={{ background: "var(--bg-muted)", borderRadius: "var(--radius-sm)", padding: 14, fontSize: 14, color: "var(--text-2)", marginBottom: 20 }}>
+                            "{reviewingBooking.review.comment}"
+                          </div>
+                        )}
+                        <p style={{ fontSize: 12, color: "var(--text-4)" }}>Submitted on {reviewingBooking.review.submittedAt}</p>
+                        <button className="btn btn-ghost btn-sm mt-16" onClick={() => setReviewingId(null)}>Close</button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="form-group">
+                          <label>Your Rating *</label>
+                          <StarRating value={reviewRating} onChange={setReviewRating} />
+                          {reviewRating > 0 && (
+                            <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 6 }}>
+                              {["","😞 Poor","😐 Fair","🙂 Good","😊 Very Good","🤩 Excellent"][reviewRating]}
+                            </p>
+                          )}
+                        </div>
+                        <div className="form-group">
+                          <label>Comment (optional)</label>
+                          <textarea className="form-control" rows={3}
+                            placeholder="Share your experience with this trainer..."
+                            value={reviewComment}
+                            onChange={e => setReviewComment(e.target.value.slice(0, 400))}
+                            maxLength={400} />
+                          <p style={{ fontSize: 11, color: "var(--text-4)", marginTop: 4 }}>{reviewComment.length}/400</p>
+                        </div>
+                        <div style={{ display: "flex", gap: 10 }}>
+                          <button className="btn btn-primary" style={{ flex: 1 }} onClick={submitReview} disabled={!reviewRating}>
+                            Submit Review
+                          </button>
+                          <button className="btn btn-ghost" style={{ flex: 1 }} onClick={() => setReviewingId(null)}>Cancel</button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -295,29 +436,68 @@ export default function MyBookings({ navigate }) {
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 16 }}>Your Upcoming Sessions</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {activeBookings.map(b => (
-                  <div key={b.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-                    <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
-                      <div style={{ width: 48, height: 48, borderRadius: "50%", background: b.trainerGender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
-                        {b.trainerIcon}
+                  <div key={b.id} className="card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: b.trainerGender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                          {b.trainerIcon}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{b.trainerName}</div>
+                          <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 2 }}>📅 {b.dateLabel} · ⏰ {b.time}</div>
+                          <div style={{ fontSize: 12, color: "var(--text-4)" }}>{b.sessionType} · {b.speciality}</div>
+                        </div>
                       </div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{b.trainerName}</div>
-                        <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 2 }}>📅 {b.dateLabel} · ⏰ {b.time}</div>
-                        <div style={{ fontSize: 12, color: "var(--text-4)" }}>{b.sessionType} · {b.speciality}</div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 11, background: b.status === "Rescheduled" ? "#dbeafe" : b.status === "Completed" ? "#dcfce7" : "#dcfce7", color: b.status === "Rescheduled" ? "#1d4ed8" : "#14532d", padding: "4px 12px", borderRadius: "var(--radius-full)", fontWeight: 700 }}>
+                          {b.status === "Rescheduled" ? "🔄" : "✅"} {b.status}
+                        </span>
+                        <span style={{ fontSize: 14, fontWeight: 700, color: "var(--primary-dark)" }}>₹{b.price}</span>
+                        <button className="btn btn-ghost btn-sm" onClick={() => downloadCalendar(b)} style={{ fontSize: 12 }}>📅 Calendar</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => openManage(b, "reschedule")} style={{ fontSize: 12 }}>🔄 Reschedule</button>
+                        <button className="btn btn-sm" onClick={() => openManage(b, "cancel")}
+                          style={{ fontSize: 12, background: "#fff5f5", color: "var(--red-500)", border: "1px solid #fecaca", borderRadius: "var(--radius-xs)", padding: "6px 12px", cursor: "pointer", fontFamily: "var(--font-body)" }}>
+                          ✕ Cancel
+                        </button>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: 11, background: b.status === "Rescheduled" ? "#dbeafe" : "#dcfce7", color: b.status === "Rescheduled" ? "#1d4ed8" : "#14532d", padding: "4px 12px", borderRadius: "var(--radius-full)", fontWeight: 700 }}>
-                        {b.status === "Rescheduled" ? "🔄" : "✅"} {b.status}
-                      </span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "var(--primary-dark)" }}>₹{b.price}</span>
-                      <button className="btn btn-ghost btn-sm" onClick={() => openManage(b, "reschedule")} style={{ fontSize: 12 }}>
-                        🔄 Reschedule
-                      </button>
-                      <button className="btn btn-sm" onClick={() => openManage(b, "cancel")}
-                        style={{ fontSize: 12, background: "#fff5f5", color: "var(--red-500)", border: "1px solid #fecaca", borderRadius: "var(--radius-xs)", padding: "6px 12px", cursor: "pointer", fontFamily: "var(--font-body)" }}>
-                        ✕ Cancel
-                      </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Completed bookings with review option */}
+          {completedBookings.length > 0 && (
+            <div style={{ marginBottom: 32 }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 16 }}>Completed Sessions</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {completedBookings.map(b => (
+                  <div key={b.id} className="card">
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+                      <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                        <div style={{ width: 48, height: 48, borderRadius: "50%", background: b.trainerGender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, flexShrink: 0 }}>
+                          {b.trainerIcon}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{b.trainerName}</div>
+                          <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 2 }}>📅 {b.dateLabel} · ⏰ {b.time}</div>
+                          {b.review && (
+                            <div style={{ display: "flex", gap: 4, alignItems: "center", marginTop: 4 }}>
+                              {[1,2,3,4,5].map(s => (
+                                <span key={s} style={{ fontSize: 14, color: s <= b.review.rating ? "#f59e0b" : "#d1d5db" }}>★</span>
+                              ))}
+                              <span style={{ fontSize: 12, color: "var(--text-4)", marginLeft: 4 }}>Your review</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span style={{ fontSize: 11, background: "#dcfce7", color: "#14532d", padding: "4px 12px", borderRadius: "var(--radius-full)", fontWeight: 700 }}>✅ Completed</span>
+                        <button className="btn btn-primary btn-sm" onClick={() => { setReviewingId(b.id); setReviewRating(b.review?.rating || 0); setReviewComment(b.review?.comment || ""); }}>
+                          {b.review ? "View Review" : "⭐ Rate Session"}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -354,14 +534,11 @@ export default function MyBookings({ navigate }) {
             </div>
           )}
 
-          {/* Book a session */}
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 16 }}>Book a Session</h2>
           <div className="grid-2 anim-fade-up-2">
             {TRAINERS_DATA.map(trainer => (
               <div key={trainer.id} className="card card-hover" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
-                <div style={{ width: 52, height: 52, borderRadius: "50%", background: trainer.gender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>
-                  {trainer.typeIcon}
-                </div>
+                <div style={{ width: 52, height: 52, borderRadius: "50%", background: trainer.gender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>{trainer.typeIcon}</div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{trainer.name}</div>
                   <div style={{ fontSize: 13, color: "var(--primary)", marginBottom: 2 }}>{trainer.type} · {trainer.speciality}</div>
@@ -393,7 +570,6 @@ export default function MyBookings({ navigate }) {
               <p style={{ fontSize: 13, color: "var(--text-3)" }}>{selectedTrainer.speciality} · ₹{selectedTrainer.pricePerHour}/hr</p>
             </div>
           </div>
-
           <div className="form-group">
             <label>Session Type</label>
             <div style={{ display: "flex", gap: 10 }}>
@@ -405,7 +581,6 @@ export default function MyBookings({ navigate }) {
               ))}
             </div>
           </div>
-
           <div className="form-group">
             <label>Select Date <span style={{ color: "var(--red-500)" }}>*</span></label>
             <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 8 }}>
@@ -420,7 +595,6 @@ export default function MyBookings({ navigate }) {
             </div>
             {selectedDate && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 8 }}>✓ {selectedDate.label} selected</p>}
           </div>
-
           <div className="form-group">
             <label>Select Time Slot <span style={{ color: "var(--red-500)" }}>*</span></label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
@@ -433,22 +607,18 @@ export default function MyBookings({ navigate }) {
             </div>
             {selectedTime && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 8 }}>✓ {selectedTime} selected</p>}
           </div>
-
           <div className="form-group">
             <label>Notes for Trainer (optional)</label>
-            <textarea className="form-control" rows={3} placeholder="Any health conditions, goals, or specific requests..." value={notes} onChange={e => setNotes(e.target.value)} />
+            <textarea className="form-control" rows={3} placeholder="Any health conditions, goals, or specific requests..." value={notes} onChange={e => setNotes(e.target.value)} maxLength={400} />
           </div>
-
-          <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 16, marginBottom: 20 }}>
+          <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 16, marginBottom: 16 }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}><span style={{ color: "var(--text-3)" }}>Session fee</span><span style={{ fontWeight: 600 }}>₹{selectedTrainer.pricePerHour}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, marginBottom: 8 }}><span style={{ color: "var(--text-3)" }}>Platform fee</span><span style={{ fontWeight: 600, color: "var(--primary)" }}>₹0 (waived)</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 4 }}><span style={{ fontWeight: 700 }}>Total</span><span style={{ fontWeight: 700, color: "var(--primary-dark)" }}>₹{selectedTrainer.pricePerHour}</span></div>
           </div>
-
           <div style={{ background: "#fff8e1", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 16, fontSize: 12, color: "#92400e" }}>
             📋 <strong>Cancellation Policy:</strong> 12+ hrs = full refund · 6-12 hrs = 10% fee · 1-6 hrs = 20% fee · &lt;1 hr = 50% fee
           </div>
-
           <button className="btn btn-primary btn-full btn-lg" onClick={handleConfirm} disabled={!selectedDate || !selectedTime}>
             {(!selectedDate || !selectedTime) ? "Please select date & time to continue" : "Continue to Review →"}
           </button>
@@ -477,7 +647,7 @@ export default function MyBookings({ navigate }) {
             ⚠️ By confirming, you agree to our <button onClick={() => navigate("guidelines")} style={{ background: "none", border: "none", color: "#92400e", fontWeight: 700, cursor: "pointer", fontSize: 12, textDecoration: "underline" }}>platform guidelines</button>.
           </div>
           <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)" }}>
-            📧 Confirmation will be sent to <strong>{profile?.email}</strong>
+            📅 A calendar reminder will be available to download after booking.
           </div>
           <button className="btn btn-primary btn-full btn-lg" onClick={handlePayment}>Pay ₹{selectedTrainer.pricePerHour} & Confirm Booking</button>
           <p style={{ fontSize: 11, color: "var(--text-4)", textAlign: "center", marginTop: 10 }}>Razorpay integration coming soon. This confirms your demo booking.</p>

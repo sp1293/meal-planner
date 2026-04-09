@@ -2,17 +2,23 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+// ── All sensitive config loaded from environment variables ─────────────────
+// Never hardcode API keys in source code
 const firebaseConfig = {
-  apiKey: "AIzaSyAYdAFNO7QKy90dx1i1AesSr0KQILN8Fcw",
-  authDomain: "nourishai-27d26.firebaseapp.com",
-  projectId: "nourishai-27d26",
-  storageBucket: "nourishai-27d26.firebasestorage.app",
-  messagingSenderId: "1084558914620",
-  appId: "1:1084558914620:web:6e268913b0a748927e7f39"
+  apiKey:            process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain:        process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId:         process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket:     process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             process.env.REACT_APP_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const auth           = getAuth(app);
+export const db             = getFirestore(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Request additional Google profile scopes
+googleProvider.addScope("email");
+googleProvider.addScope("profile");

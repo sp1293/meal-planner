@@ -12,7 +12,7 @@ export function Footer({ navigate }) {
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>AI-powered meal planning for every age group and dietary need.</p>
           </div>
           {[
-            { title: "Product", links: [["Meal Planner","planner"],["My Plans","my-plans"],["Pricing","subscription"]] },
+            { title: "Product", links: [["Meal Planner","planner"],["My Plans","my-plans"],["Pricing","subscription"],["🍳 Leftover Chef", "leftover-chef"]] },
             { title: "Account", links: [["Sign Up","signup"],["Sign In","login"],["Account Settings","account"]] },
           ].map(col => (
             <div key={col.title}>

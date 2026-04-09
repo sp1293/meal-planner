@@ -36,48 +36,63 @@ export default function Navbar({ page, navigate }) {
     tierBadge: { padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: plan.colorLight || "var(--green-100)", color: plan.color || "var(--green-800)" },
     adminBadge: { padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: "#fee2e2", color: "#991b1b" },
     avatar: { width: 36, height: 36, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, cursor: "pointer", border: "2px solid var(--primary-soft)" },
-    dropdown: { position: "absolute", top: 56, right: 24, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 220, animation: "slideDown 0.2s ease forwards" },
+    dropdown: { position: "absolute", top: 56, right: 0, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 230, animation: "slideDown 0.2s ease forwards" },
     dropItem: { width: "100%", padding: "10px 14px", borderRadius: "var(--radius-xs)", fontSize: 14, color: "var(--text-2)", background: "none", border: "none", textAlign: "left", transition: "var(--transition)", display: "block", cursor: "pointer", fontFamily: "var(--font-body)" },
   };
 
   const initials = (profile?.displayName || profile?.name || user?.email || "U").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 
-  // Dropdown items based on role
+  // ── Dropdown items based on role ─────────────────────────────────────────
   const dropdownItems = role === "admin"
     ? [
-        { label: "Dashboard",    id: "dashboard" },
-        { label: "⚙️ Admin Panel", id: "admin" },
-        { label: "Trainers",     id: "trainers" },
-        { label: "Meal Planner", id: "planner" },
-        { label: "Account",      id: "account" },
-        { label: "Guidelines",   id: "guidelines" },
+        { label: "Dashboard",           id: "dashboard" },
+        { label: "⚙️ Admin Panel",       id: "admin" },
+        { label: "Trainers",            id: "trainers" },
+        { label: "Meal Planner",        id: "planner" },
+        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
+        { label: "🔥 Calorie Tracker",  id: "calories" },
+        { label: "🎯 Goal Tracker",     id: "goals" },
+        { label: "Account",             id: "account" },
+        { label: "Guidelines",          id: "guidelines" },
+        { label: "🔒 Privacy Policy",   id: "privacy" },
       ]
     : [
-        { label: "Dashboard",      id: "dashboard" },
-        { label: "Meal Planner",   id: "planner" },
-        { label: "My Plans",       id: "my-plans" },
-        { label: "Trainers",       id: "trainers" },
-        { label: "My Bookings",    id: "my-bookings" },
-        { label: "🎁 Refer & Earn", id: "referral" },
-        { label: "Account",        id: "account" },
-        { label: "Subscription",   id: "subscription" },
-        { label: "Guidelines",     id: "guidelines" },
+        { label: "Dashboard",           id: "dashboard" },
+        { label: "Meal Planner",        id: "planner" },
+        { label: "My Plans",            id: "my-plans" },
+        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
+        { label: "Trainers",            id: "trainers" },
+        { label: "My Bookings",         id: "my-bookings" },
+        { label: "🔥 Calorie Tracker",  id: "calories" },
+        { label: "🎯 Goal Tracker",     id: "goals" },
+        { label: "🎁 Refer & Earn",     id: "referral" },
+        { label: "Account",             id: "account" },
+        { label: "Subscription",        id: "subscription" },
+        { label: "Guidelines",          id: "guidelines" },
+        { label: "🔒 Privacy Policy",   id: "privacy" },
       ];
 
   return (
     <nav style={s.nav}>
       <div style={s.inner}>
+        {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
           <div style={s.brandLogo}>🥗</div>
           <span style={s.brandName}>NourishAI</span>
         </div>
 
+        {/* Nav links */}
         <div style={s.links} className="hide-mobile">
           {navLinks.map(l => (
             <button key={l.id} style={{ ...s.link, ...(page === l.id ? s.linkActive : {}) }} onClick={() => navigate(l.id)}>
               {l.label}
             </button>
           ))}
+          {user && (
+            <button style={{ ...s.link, ...(page === "leftover-chef" ? s.linkActive : {}) }} onClick={() => navigate("leftover-chef")}>
+              🍳 Leftover Chef
+            </button>
+          )}
           {user && (
             <button style={{ ...s.link, ...(page === "guidelines" ? s.linkActive : {}) }} onClick={() => navigate("guidelines")}>
               Guidelines
@@ -90,6 +105,7 @@ export default function Navbar({ page, navigate }) {
           )}
         </div>
 
+        {/* Right side */}
         <div style={s.right}>
           {user ? (
             <>
@@ -104,11 +120,13 @@ export default function Navbar({ page, navigate }) {
                 </div>
                 {menuOpen && (
                   <div style={s.dropdown} onClick={() => setMenuOpen(false)}>
+                    {/* User info */}
                     <div style={{ padding: "10px 14px 12px", borderBottom: "1px solid var(--border)", marginBottom: 6 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{profile?.displayName || profile?.name || "User"}</div>
                       <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user?.email || profile?.email}</div>
                       {role === "admin" && <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700, marginTop: 2 }}>Administrator</div>}
                     </div>
+                    {/* Menu items */}
                     {dropdownItems.map(item => (
                       <button key={item.id} style={s.dropItem} onClick={() => navigate(item.id)}
                         onMouseEnter={e => e.target.style.background = "var(--bg-muted)"}
@@ -116,9 +134,10 @@ export default function Navbar({ page, navigate }) {
                         {item.label}
                       </button>
                     ))}
+                    {/* Sign out */}
                     <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 6 }}>
                       <button style={{ ...s.dropItem, color: "var(--red-500)" }} onClick={handleLogout}
-                        onMouseEnter={e => e.target.style.background = "var(--red-50)"}
+                        onMouseEnter={e => e.target.style.background = "#fff5f5"}
                         onMouseLeave={e => e.target.style.background = "none"}>
                         Sign out
                       </button>

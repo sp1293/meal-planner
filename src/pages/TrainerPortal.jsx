@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { collection, query, where, getDocs, doc, updateDoc, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase";
 
 export default function TrainerPortal({ navigate }) {
@@ -9,6 +9,11 @@ export default function TrainerPortal({ navigate }) {
   const [loading,   setLoading]   = useState(true);
   const [activeTab, setActiveTab] = useState("upcoming");
   const [error,     setError]     = useState("");
+
+  // ── useEffect MUST be before any early return ──────────────────────────────
+  useEffect(() => {
+    if (profile?.role === "trainer") loadSessions();
+  }, [profile?.role]);
 
   // ── Only trainers can access ───────────────────────────────────────────────
   if (profile?.role !== "trainer") {
@@ -22,18 +27,14 @@ export default function TrainerPortal({ navigate }) {
     );
   }
 
-  useEffect(() => { loadSessions(); }, []);
-
   async function loadSessions() {
     setLoading(true);
     try {
-      // Load all bookings where trainerId matches this trainer
       const snap = await getDocs(
         query(collection(db, "bookings"), where("trainerId", "==", profile.uid))
       );
       setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     } catch {
-      // If no bookings collection yet, show empty state
       setSessions([]);
     } finally {
       setLoading(false);
@@ -61,9 +62,9 @@ export default function TrainerPortal({ navigate }) {
   const completed = sessions.filter(s => s.status === "Completed");
   const cancelled = sessions.filter(s => s.status === "Cancelled");
 
-  const totalEarnings  = completed.reduce((sum, s) => sum + (s.price || 0), 0);
-  const platformCut    = Math.round(totalEarnings * 0.20);
-  const trainerPayout  = totalEarnings - platformCut;
+  const totalEarnings = completed.reduce((sum, s) => sum + (s.price || 0), 0);
+  const platformCut   = Math.round(totalEarnings * 0.20);
+  const trainerPayout = totalEarnings - platformCut;
 
   const tabs = [
     { id: "upcoming",  label: "Upcoming",  count: upcoming.length },
@@ -163,16 +164,20 @@ export default function TrainerPortal({ navigate }) {
               <span style={{ fontWeight: 700 }}>Your payout</span>
               <span style={{ fontWeight: 700, color: "var(--primary-dark)" }}>₹{trainerPayout.toLocaleString("en-IN")}</span>
             </div>
-            <p style={{ fontSize: 12, color: "var(--text-4)", marginTop: 8 }}>Payouts are processed within 3-5 business days after session completion.</p>
+            <p style={{ fontSize: 12, color: "var(--text-4)", marginTop: 8 }}>Payouts processed within 3-5 business days after session completion.</p>
           </div>
         )}
 
-        {/* Sessions tabs */}
+        {/* Session tabs */}
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           {tabs.map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               style={{ padding: "9px 18px", borderRadius: "var(--radius-full)", border: `1.5px solid ${activeTab === tab.id ? "var(--primary)" : "var(--border)"}`, background: activeTab === tab.id ? "var(--primary)" : "#fff", color: activeTab === tab.id ? "#fff" : "var(--text-3)", fontSize: 14, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-body)", transition: "var(--transition)" }}>
-              {tab.label} {tab.count > 0 && <span style={{ background: activeTab === tab.id ? "rgba(255,255,255,0.3)" : "var(--primary-pale)", color: activeTab === tab.id ? "#fff" : "var(--primary)", borderRadius: "var(--radius-full)", padding: "1px 7px", fontSize: 11, marginLeft: 4 }}>{tab.count}</span>}
+              {tab.label} {tab.count > 0 && (
+                <span style={{ background: activeTab === tab.id ? "rgba(255,255,255,0.3)" : "var(--primary-pale)", color: activeTab === tab.id ? "#fff" : "var(--primary)", borderRadius: "var(--radius-full)", padding: "1px 7px", fontSize: 11, marginLeft: 4 }}>
+                  {tab.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -235,7 +240,6 @@ export default function TrainerPortal({ navigate }) {
           </div>
         )}
 
-        {/* Platform guidelines reminder */}
         <div className="card mt-24" style={{ background: "#fff8e1", border: "1px solid #fde68a" }}>
           <h3 style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#92400e", marginBottom: 10 }}>🔒 Trainer Reminders</h3>
           {["Never request payment or contact outside NourishAI.","Mark sessions complete promptly after each session.","Maintain professional conduct at all times.","Contact support@nourishai.com for any issues."].map((r, i) => (

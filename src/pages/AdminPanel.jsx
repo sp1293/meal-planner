@@ -3,7 +3,6 @@ import { useAuth } from "../context/AuthContext";
 import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 
-// ─── Sanitize input to prevent XSS ───────────────────────────────────────────
 function sanitize(str) {
   return String(str).replace(/[<>"'`]/g, "").trim();
 }
@@ -23,7 +22,6 @@ export default function AdminPanel({ navigate }) {
   const [error,         setError]         = useState("");
   const [success,       setSuccess]       = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
-
   const [form, setForm] = useState({
     name: "", email: "", password: "", type: "Yoga Instructor",
     speciality: "Hatha Yoga", location: "Bengaluru",
@@ -33,6 +31,11 @@ export default function AdminPanel({ navigate }) {
   });
 
   const DAY_OPTIONS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+  // ── useEffect MUST be before any early return ──────────────────────────────
+  useEffect(() => {
+    if (profile?.role === "admin") loadTrainers();
+  }, [profile?.role]);
 
   // ── Only admin can access ──────────────────────────────────────────────────
   if (profile?.role !== "admin") {
@@ -45,11 +48,6 @@ export default function AdminPanel({ navigate }) {
       </div>
     );
   }
-
-  // ── Load trainers from Firestore ───────────────────────────────────────────
-  useEffect(() => {
-    loadTrainers();
-  }, []);
 
   async function loadTrainers() {
     setLoading(true);
@@ -79,8 +77,6 @@ export default function AdminPanel({ navigate }) {
   async function createTrainer(e) {
     e.preventDefault();
     setError(""); setSuccess("");
-
-    // Validate
     if (!form.name || !form.email || !form.password) { setError("Name, email and password are required."); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (!form.experience || isNaN(form.experience)) { setError("Please enter valid years of experience."); return; }
@@ -89,15 +85,12 @@ export default function AdminPanel({ navigate }) {
 
     setCreating(true);
     try {
-      // Create Firebase Auth user via Admin SDK would be ideal,
-      // but for client-side we store trainer data in Firestore
-      // and use a separate trainers collection
       const trainerId = `trainer_${Date.now()}`;
       const trainerData = {
         id:            trainerId,
         name:          sanitize(form.name),
         email:         sanitize(form.email).toLowerCase(),
-        password:      form.password, // In production: hash this or use Firebase Admin SDK
+        password:      form.password,
         type:          form.type,
         typeIcon:      form.type === "Yoga Instructor" ? "🧘" : "🏋️",
         speciality:    form.speciality,
@@ -118,10 +111,9 @@ export default function AdminPanel({ navigate }) {
         createdAt:     serverTimestamp(),
         createdBy:     profile.uid,
       };
-
       await setDoc(doc(db, "trainers", trainerId), trainerData);
       setTrainers(prev => [...prev, trainerData]);
-      setSuccess(`✅ Trainer "${form.name}" created successfully! Share their email and password with them to login.`);
+      setSuccess(`✅ Trainer "${form.name}" created! Share their email and password with them to login.`);
       setShowForm(false);
       setForm({
         name: "", email: "", password: "", type: "Yoga Instructor",
@@ -192,7 +184,6 @@ export default function AdminPanel({ navigate }) {
         </div>
       </div>
 
-      {/* Trainers list */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--primary-dark)" }}>Trainers</h2>
         <button className="btn btn-primary" onClick={() => { setShowForm(true); setError(""); }}>+ Add New Trainer</button>
@@ -272,7 +263,7 @@ export default function AdminPanel({ navigate }) {
               </div>
             </div>
             <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}>
-              📋 After creating, share the <strong>email and password</strong> with the trainer. They can login at the main login page and will be redirected to their trainer portal.
+              📋 After creating, share the <strong>email and password</strong> with the trainer. They login at the main login page and get redirected to their trainer portal.
             </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button type="submit" className="btn btn-primary" disabled={creating}>
@@ -303,7 +294,10 @@ export default function AdminPanel({ navigate }) {
 
       {/* Trainer cards */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: 48, color: "var(--text-3)" }}><span className="spin" style={{ fontSize: 32 }}>⟳</span><p style={{ marginTop: 12 }}>Loading trainers...</p></div>
+        <div style={{ textAlign: "center", padding: 48, color: "var(--text-3)" }}>
+          <span className="spin" style={{ fontSize: 32 }}>⟳</span>
+          <p style={{ marginTop: 12 }}>Loading trainers...</p>
+        </div>
       ) : trainers.length === 0 ? (
         <div className="card text-center" style={{ padding: 48 }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>👤</div>
@@ -343,7 +337,6 @@ export default function AdminPanel({ navigate }) {
         </div>
       )}
 
-      {/* Platform guidelines link */}
       <div className="card mt-24" style={{ background: "var(--primary-pale)", border: "1px solid var(--primary-soft)" }}>
         <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--primary-dark)", marginBottom: 10 }}>🛡️ Admin Security Reminders</h3>
         {[
