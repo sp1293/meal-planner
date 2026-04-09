@@ -4,17 +4,17 @@ import { useSub } from "../context/SubContext";
 import { TIERS } from "../config";
 
 export default function Navbar({ page, navigate }) {
-  const { user, profile, logout } = useAuth();
+  const { user, profile, logout, role } = useAuth();
   const { tier } = useSub();
   const [menuOpen, setMenuOpen] = useState(false);
   const plan = TIERS[tier] || TIERS.free;
 
   const navLinks = user
     ? [
-        { id: "dashboard",   label: "Dashboard" },
-        { id: "planner",     label: "Meal Planner" },
-        { id: "my-plans",    label: "My Plans" },
-        { id: "trainers",    label: "Trainers" },
+        { id: "dashboard",  label: "Dashboard" },
+        { id: "planner",    label: "Meal Planner" },
+        { id: "my-plans",   label: "My Plans" },
+        { id: "trainers",   label: "Trainers" },
       ]
     : [];
 
@@ -34,12 +34,35 @@ export default function Navbar({ page, navigate }) {
     linkActive: { color: "var(--primary)", background: "var(--primary-pale)", fontWeight: 600 },
     right: { display: "flex", alignItems: "center", gap: 10 },
     tierBadge: { padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: plan.colorLight || "var(--green-100)", color: plan.color || "var(--green-800)" },
+    adminBadge: { padding: "4px 12px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: "#fee2e2", color: "#991b1b" },
     avatar: { width: 36, height: 36, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, cursor: "pointer", border: "2px solid var(--primary-soft)" },
-    dropdown: { position: "absolute", top: 56, right: 24, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 210, animation: "slideDown 0.2s ease forwards" },
+    dropdown: { position: "absolute", top: 56, right: 24, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 220, animation: "slideDown 0.2s ease forwards" },
     dropItem: { width: "100%", padding: "10px 14px", borderRadius: "var(--radius-xs)", fontSize: 14, color: "var(--text-2)", background: "none", border: "none", textAlign: "left", transition: "var(--transition)", display: "block", cursor: "pointer", fontFamily: "var(--font-body)" },
   };
 
-  const initials = (profile?.displayName || user?.email || "U").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  const initials = (profile?.displayName || profile?.name || user?.email || "U").split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+  // Dropdown items based on role
+  const dropdownItems = role === "admin"
+    ? [
+        { label: "Dashboard",    id: "dashboard" },
+        { label: "⚙️ Admin Panel", id: "admin" },
+        { label: "Trainers",     id: "trainers" },
+        { label: "Meal Planner", id: "planner" },
+        { label: "Account",      id: "account" },
+        { label: "Guidelines",   id: "guidelines" },
+      ]
+    : [
+        { label: "Dashboard",      id: "dashboard" },
+        { label: "Meal Planner",   id: "planner" },
+        { label: "My Plans",       id: "my-plans" },
+        { label: "Trainers",       id: "trainers" },
+        { label: "My Bookings",    id: "my-bookings" },
+        { label: "🎁 Refer & Earn", id: "referral" },
+        { label: "Account",        id: "account" },
+        { label: "Subscription",   id: "subscription" },
+        { label: "Guidelines",     id: "guidelines" },
+      ];
 
   return (
     <nav style={s.nav}>
@@ -55,15 +78,24 @@ export default function Navbar({ page, navigate }) {
               {l.label}
             </button>
           ))}
-          <button style={{ ...s.link, ...(page === "guidelines" ? s.linkActive : {}) }} onClick={() => navigate("guidelines")}>
-            Guidelines
-          </button>
+          {user && (
+            <button style={{ ...s.link, ...(page === "guidelines" ? s.linkActive : {}) }} onClick={() => navigate("guidelines")}>
+              Guidelines
+            </button>
+          )}
+          {role === "admin" && (
+            <button style={{ ...s.link, color: "#991b1b", background: page === "admin" ? "#fee2e2" : "none" }} onClick={() => navigate("admin")}>
+              ⚙️ Admin
+            </button>
+          )}
         </div>
 
         <div style={s.right}>
           {user ? (
             <>
-              <span style={s.tierBadge}>{plan.name}</span>
+              {role === "admin"
+                ? <span style={s.adminBadge}>Admin</span>
+                : <span style={s.tierBadge}>{plan.name}</span>}
               <div style={{ position: "relative" }}>
                 <div style={s.avatar} onClick={() => setMenuOpen(o => !o)}>
                   {profile?.photoURL
@@ -73,19 +105,11 @@ export default function Navbar({ page, navigate }) {
                 {menuOpen && (
                   <div style={s.dropdown} onClick={() => setMenuOpen(false)}>
                     <div style={{ padding: "10px 14px 12px", borderBottom: "1px solid var(--border)", marginBottom: 6 }}>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>{profile?.displayName || "User"}</div>
-                      <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user.email}</div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{profile?.displayName || profile?.name || "User"}</div>
+                      <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user?.email || profile?.email}</div>
+                      {role === "admin" && <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700, marginTop: 2 }}>Administrator</div>}
                     </div>
-                    {[
-                      { label: "Dashboard",        id: "dashboard" },
-                      { label: "Meal Planner",     id: "planner" },
-                      { label: "My Plans",         id: "my-plans" },
-                      { label: "Trainers",         id: "trainers" },
-                      { label: "My Bookings",      id: "my-bookings" },
-                      { label: "Account",          id: "account" },
-                      { label: "Subscription",     id: "subscription" },
-                      { label: "Guidelines",       id: "guidelines" },
-                    ].map(item => (
+                    {dropdownItems.map(item => (
                       <button key={item.id} style={s.dropItem} onClick={() => navigate(item.id)}
                         onMouseEnter={e => e.target.style.background = "var(--bg-muted)"}
                         onMouseLeave={e => e.target.style.background = "none"}>
