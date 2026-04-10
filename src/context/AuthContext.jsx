@@ -7,13 +7,13 @@ import {
   signOut,
   updateProfile,
   sendEmailVerification,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
 import { auth, db, googleProvider } from "../firebase";
 
 const AuthContext = createContext(null);
 
-// ── Input sanitizer ────────────────────────────────────────────────────────
 function sanitize(str) {
   return String(str || "").replace(/[<>"'`]/g, "").trim().slice(0, 200);
 }
@@ -27,12 +27,15 @@ export function AuthProvider({ children }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        // Check users collection first
         const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
         if (userSnap.exists()) {
-          setProfile(userSnap.data());
+          const existing = userSnap.data();
+          if (existing.emailVerified !== firebaseUser.emailVerified) {
+            await setDoc(doc(db, "users", firebaseUser.uid),
+              { emailVerified: firebaseUser.emailVerified }, { merge: true });
+          }
+          setProfile({ ...existing, emailVerified: firebaseUser.emailVerified });
         } else {
-          // Check if trainer (matched by email in trainers collection)
           try {
             const trainerSnap = await getDocs(
               query(collection(db, "trainers"), where("email", "==", firebaseUser.email?.toLowerCase()))
@@ -59,25 +62,24 @@ export function AuthProvider({ children }) {
     const snap = await getDoc(ref);
     if (!snap.exists()) {
       const data = {
-        uid:          firebaseUser.uid,
-        email:        sanitize(firebaseUser.email),
-        displayName:  sanitize(firebaseUser.displayName || extra.displayName || ""),
-        photoURL:     firebaseUser.photoURL || "",
-        role:         "student",
-        tier:         "free",
-        plansUsed:    0,
-        plansResetAt: serverTimestamp(),
-        createdAt:    serverTimestamp(),
-        gender:       sanitize(extra.gender || ""),
-        referrals:    [],
-        referralCode: `NOURISH-${firebaseUser.uid.slice(0, 6).toUpperCase()}`,
-        bookings:     [],
+        uid:           firebaseUser.uid,
+        email:         sanitize(firebaseUser.email),
+        displayName:   sanitize(firebaseUser.displayName || extra.displayName || ""),
+        photoURL:      firebaseUser.photoURL || "",
+        role:          "student",
+        tier:          "free",
+        plansUsed:     0,
+        plansResetAt:  serverTimestamp(),
+        createdAt:     serverTimestamp(),
+        gender:        sanitize(extra.gender || ""),
+        referrals:     [],
+        referralCode:  `MITA-${firebaseUser.uid.slice(0, 6).toUpperCase()}`,
+        bookings:      [],
         emailVerified: firebaseUser.emailVerified || false,
       };
       await setDoc(ref, data);
       setProfile(data);
     } else {
-      // Update emailVerified status if changed
       const existing = snap.data();
       if (existing.emailVerified !== firebaseUser.emailVerified) {
         await setDoc(ref, { emailVerified: firebaseUser.emailVerified }, { merge: true });
@@ -86,7 +88,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // ── Trainer login via Firestore ────────────────────────────────────────────
+  // ── Trainer login ──────────────────────────────────────────────────────────
   async function loginAsTrainer(email, password) {
     const snap = await getDocs(
       query(collection(db, "trainers"), where("email", "==", email.toLowerCase()))
@@ -99,13 +101,20 @@ export function AuthProvider({ children }) {
     return trainer;
   }
 
+  // ── Email login — blocks unverified users ──────────────────────────────────
   async function loginWithEmail(email, password) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+      if (!cred.user.emailVerified) {
+        await signOut(auth);
+        const err = new Error("Please verify your email before signing in.");
+        err.code = "auth/email-not-verified";
+        throw err;
+      }
       await createUserDoc(cred.user);
       return { user: cred.user, role: "student" };
     } catch (firebaseErr) {
-      // If Firebase auth fails, try trainer login
+      if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -115,27 +124,57 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── Email signup — sends verification, signs out immediately ───────────────
   async function signupWithEmail(email, password, name, extra = {}) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: sanitize(name) });
-
-    // Send email verification
     try {
-      await sendEmailVerification(cred.user, {
-        url: "https://mitabhukta.com",
-      });
-    } catch {
-      // Non-fatal — continue even if verification email fails
+      await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
+    } catch (e) {
+      console.warn("Verification email failed:", e.message);
     }
-
     await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
+    // Sign out immediately — must verify first
+    await signOut(auth);
+    setUser(null);
+    setProfile(null);
     return cred.user;
   }
 
+  // ── Google login ───────────────────────────────────────────────────────────
   async function loginWithGoogle() {
-    const cred = await signInWithPopup(auth, googleProvider);
-    await createUserDoc(cred.user);
-    return cred.user;
+    try {
+      const cred = await signInWithPopup(auth, googleProvider);
+      await createUserDoc(cred.user);
+      return cred.user;
+    } catch (err) {
+      if (
+        err.code === "auth/popup-closed-by-user" ||
+        err.code === "auth/cancelled-popup-request"
+      ) {
+        const e = new Error("Sign-in popup was closed. Please try again.");
+        e.code = err.code;
+        throw e;
+      }
+      if (err.code === "auth/popup-blocked") {
+        const e = new Error("Popup was blocked. Please allow popups for mitabhukta.com and try again.");
+        e.code = "auth/popup-blocked";
+        throw e;
+      }
+      throw err;
+    }
+  }
+
+  // ── Resend verification email ──────────────────────────────────────────────
+  async function resendVerificationEmail(email, password) {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
+    await signOut(auth);
+  }
+
+  // ── Password reset ─────────────────────────────────────────────────────────
+  async function resetPassword(email) {
+    await sendPasswordResetEmail(auth, email, { url: "https://mitabhukta.com" });
   }
 
   async function logout() {
@@ -145,7 +184,6 @@ export function AuthProvider({ children }) {
 
   async function updateUserProfile(data) {
     if (!user) return;
-    // Sanitize all string fields before saving
     const sanitized = Object.fromEntries(
       Object.entries(data).map(([k, v]) => [k, typeof v === "string" ? sanitize(v) : v])
     );
@@ -158,7 +196,11 @@ export function AuthProvider({ children }) {
   const role = profile?.role || "student";
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, tier, role, loginWithEmail, signupWithEmail, loginWithGoogle, logout, updateUserProfile }}>
+    <AuthContext.Provider value={{
+      user, profile, loading, tier, role,
+      loginWithEmail, signupWithEmail, loginWithGoogle,
+      logout, updateUserProfile, resetPassword, resendVerificationEmail,
+    }}>
       {children}
     </AuthContext.Provider>
   );
