@@ -77,7 +77,11 @@ export default function Navbar({ page, navigate }) {
       <div style={s.inner}>
         {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
-          <div style={s.brandLogo}>🥗</div>
+          <img 
+            src="/logo192.png" 
+            alt="Mitabhukta" 
+            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }} 
+          />
           <span style={s.brandName}>Mitabhukta</span>
         </div>
 
