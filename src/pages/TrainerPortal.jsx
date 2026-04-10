@@ -81,7 +81,7 @@ export default function TrainerPortal({ navigate }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>🥗</div>
           <div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--primary-dark)" }}>NourishAI</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "var(--primary-dark)" }}>Mitabhukta</div>
             <div style={{ fontSize: 10, color: "var(--text-4)", textTransform: "uppercase", letterSpacing: ".5px" }}>Trainer Portal</div>
           </div>
         </div>
@@ -242,7 +242,7 @@ export default function TrainerPortal({ navigate }) {
 
         <div className="card mt-24" style={{ background: "#fff8e1", border: "1px solid #fde68a" }}>
           <h3 style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#92400e", marginBottom: 10 }}>🔒 Trainer Reminders</h3>
-          {["Never request payment or contact outside NourishAI.","Mark sessions complete promptly after each session.","Maintain professional conduct at all times.","Contact support@nourishai.com for any issues."].map((r, i) => (
+          {["Never request payment or contact outside Mitabhukta.","Mark sessions complete promptly after each session.","Maintain professional conduct at all times.","Contact support@mitabhukta.com for any issues."].map((r, i) => (
             <div key={i} style={{ display: "flex", gap: 8, fontSize: 13, color: "#92400e", marginBottom: 6 }}><span>⚠️</span> {r}</div>
           ))}
         </div>

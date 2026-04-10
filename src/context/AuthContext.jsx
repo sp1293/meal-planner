@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
     if (snap.empty) throw new Error("No trainer found with this email.");
     const trainer = snap.docs[0].data();
     if (trainer.password !== password) throw new Error("Incorrect password.");
-    if (trainer.status === "suspended") throw new Error("Your account has been suspended. Contact support@nourishai.com.");
+    if (trainer.status === "suspended") throw new Error("Your account has been suspended. Contact support@mitabhukta.com.");
     setProfile({ ...trainer, role: "trainer" });
     return trainer;
   }

@@ -62,16 +62,16 @@ function downloadCalendar(booking) {
   const ics = [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//NourishAI//Session Booking//EN",
+    "PRODID:-//Mitabhukta//Session Booking//EN",
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     "BEGIN:VEVENT",
-    `UID:${booking.id}@nourishai`,
+    `UID:${booking.id}@mitabhukta`,
     `DTSTAMP:${now}`,
     `DTSTART:${startDt}`,
     `DTEND:${endDt}`,
-    `SUMMARY:NourishAI Session - ${booking.trainerName}`,
-    `DESCRIPTION:${booking.sessionType} session with ${booking.trainerName} (${booking.speciality}).\\nBooked via NourishAI.\\nDo not share personal contact outside the platform.`,
+    `SUMMARY:Mitabhukta Session - ${booking.trainerName}`,
+    `DESCRIPTION:${booking.sessionType} session with ${booking.trainerName} (${booking.speciality}).\\nBooked via Mitabhukta.\\nDo not share personal contact outside the platform.`,
     `LOCATION:${booking.sessionType === "Video call" ? "Online - link will be shared by trainer" : "In-Person - location shared by trainer"}`,
     "BEGIN:VALARM",
     "TRIGGER:-PT1H",
@@ -91,7 +91,7 @@ function downloadCalendar(booking) {
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
   a.href     = url;
-  a.download = `nourishai-session-${booking.trainerName.replace(/\s/g,"-")}.ics`;
+  a.download = `mitabhukta-session-${booking.trainerName.replace(/\s/g,"-")}.ics`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -551,7 +551,7 @@ export default function MyBookings({ navigate }) {
 
           <div className="card mt-24" style={{ background: "#fff8e1", border: "1px solid #fde68a" }}>
             <h3 style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "#92400e", marginBottom: 10 }}>🔒 Booking Safety Guidelines</h3>
-            {["Always book sessions through NourishAI — never pay trainers directly.","Do not share your personal phone number or social media with trainers.","All video sessions use secure links provided by NourishAI.","Report any trainer who asks for direct payment or personal contact."].map((rule, i) => (
+            {["Always book sessions through Mitabhukta — never pay trainers directly.","Do not share your personal phone number or social media with trainers.","All video sessions use secure links provided by Mitabhukta.","Report any trainer who asks for direct payment or personal contact."].map((rule, i) => (
               <div key={i} style={{ display: "flex", gap: 8, fontSize: 13, color: "#92400e", marginBottom: 6 }}><span>⚠️</span> {rule}</div>
             ))}
             <button onClick={() => navigate("guidelines")} style={{ background: "none", border: "none", color: "#92400e", fontWeight: 700, cursor: "pointer", fontSize: 13, marginTop: 8, padding: 0 }}>Read full platform guidelines →</button>

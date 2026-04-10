@@ -78,7 +78,7 @@ export default function Navbar({ page, navigate }) {
         {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
           <div style={s.brandLogo}>🥗</div>
-          <span style={s.brandName}>NourishAI</span>
+          <span style={s.brandName}>Mitabhukta</span>
         </div>
 
         {/* Nav links */}

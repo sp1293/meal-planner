@@ -35,7 +35,7 @@ export default function Dashboard({ navigate }) {
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(24px, 4vw, 36px)", color: "var(--primary-dark)", marginBottom: 6 }}>
           Good {getTimeOfDay()}, {name}! 👋
         </h1>
-        <p style={{ fontSize: 16, color: "var(--text-3)" }}>Here's your NourishAI overview.</p>
+        <p style={{ fontSize: 16, color: "var(--text-3)" }}>Here's your Mitabhukta overview.</p>
       </div>
 
       {/* Stats */}
@@ -140,7 +140,7 @@ export default function Dashboard({ navigate }) {
       </h2>
       <div className="card anim-fade-up-4" style={{ marginBottom: 28 }}>
         <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>
-          Book certified yoga instructors and gym trainers. All sessions managed securely through NourishAI.
+          Book certified yoga instructors and gym trainers. All sessions managed securely through Mitabhukta.
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
           {TRAINERS_DATA.map(trainer => (
@@ -173,8 +173,8 @@ export default function Dashboard({ navigate }) {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div style={{ padding: "12px 16px", background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--primary-dark)", flex: 1 }}>
-            🌟 Are you a trainer? <strong>Partner with NourishAI</strong> and reach thousands of users.{" "}
-            <a href="mailto:trainers@nourishai.com" style={{ color: "var(--primary)", fontWeight: 700 }}>Apply now →</a>
+            🌟 Are you a trainer? <strong>Partner with Mitabhukta</strong> and reach thousands of users.{" "}
+            <a href="mailto:trainers@mitabhukta.com" style={{ color: "var(--primary)", fontWeight: 700 }}>Apply now →</a>
           </div>
           <button className="btn btn-secondary btn-sm" onClick={() => navigate("trainers")}>View All Trainers →</button>
         </div>

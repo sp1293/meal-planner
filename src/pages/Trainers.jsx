@@ -70,13 +70,13 @@ export default function Trainers({ navigate }) {
     <div className="page">
       <div className="page-title anim-fade-up">
         <h1>💪 Wellness Experts</h1>
-        <p>Book certified yoga instructors and gym trainers. All sessions managed securely through NourishAI.</p>
+        <p>Book certified yoga instructors and gym trainers. All sessions managed securely through Mitabhukta.</p>
       </div>
 
       {/* Platform Trust Banner */}
       <div className="banner banner-info mb-24 anim-fade-up" style={{ alignItems: "flex-start", flexDirection: "column", gap: 6 }}>
         <div style={{ fontWeight: 700, fontSize: 14 }}>🔒 Safe & Secure Bookings</div>
-        <div style={{ fontSize: 13 }}>All payments go through NourishAI. Sessions are protected by our platform guidelines. <button onClick={() => navigate("guidelines")} style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Read our guidelines →</button></div>
+        <div style={{ fontSize: 13 }}>All payments go through Mitabhukta. Sessions are protected by our platform guidelines. <button onClick={() => navigate("guidelines")} style={{ background: "none", border: "none", color: "var(--primary)", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>Read our guidelines →</button></div>
       </div>
 
       {/* Filters */}
@@ -208,7 +208,7 @@ export default function Trainers({ navigate }) {
             </div>
 
             <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "var(--radius-sm)", padding: 14, marginBottom: 20, fontSize: 13, color: "#92400e" }}>
-              🔒 <strong>Platform Protected:</strong> All bookings and payments are managed by NourishAI. Do not share personal contact details or make payments outside this platform.
+              🔒 <strong>Platform Protected:</strong> All bookings and payments are managed by Mitabhukta. Do not share personal contact details or make payments outside this platform.
             </div>
 
             <div style={{ display: "flex", gap: 10 }}>
@@ -227,9 +227,9 @@ export default function Trainers({ navigate }) {
         <div style={{ fontSize: 32, marginBottom: 12 }}>🌟</div>
         <h3 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 8 }}>Are you a Trainer?</h3>
         <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20, maxWidth: 400, margin: "0 auto 20px" }}>
-          Join NourishAI as a certified trainer. Get access to students, manage your schedule, and grow your practice.
+          Join Mitabhukta as a certified trainer. Get access to students, manage your schedule, and grow your practice.
         </p>
-        <a href="mailto:trainers@nourishai.com" className="btn btn-primary">Apply to Join as Trainer →</a>
+        <a href="mailto:trainers@mitabhukta.com" className="btn btn-primary">Apply to Join as Trainer →</a>
       </div>
     </div>
   );

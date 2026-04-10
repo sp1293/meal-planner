@@ -31,13 +31,13 @@ export default function Referral({ navigate }) {
   }
 
   function shareWhatsApp() {
-    const msg = `🥗 Hey! I've been using NourishAI for personalized Indian meal plans and it's amazing!\n\nGet your first AI-powered meal plan free: ${referralLink}\n\nUse my referral code: *${referralCode}*`;
+    const msg = `🥗 Hey! I've been using Mitabhukta for personalized Indian meal plans and it's amazing!\n\nGet your first AI-powered meal plan free: ${referralLink}\n\nUse my referral code: *${referralCode}*`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
   function shareGeneral() {
     if (navigator.share) {
-      navigator.share({ title: "NourishAI - AI Meal Planner", text: `Join me on NourishAI! Use my referral code ${referralCode} to get started.`, url: referralLink });
+      navigator.share({ title: "Mitabhukta - AI Meal Planner", text: `Join me on Mitabhukta! Use my referral code ${referralCode} to get started.`, url: referralLink });
     } else {
       copyLink();
     }
@@ -47,7 +47,7 @@ export default function Referral({ navigate }) {
     <div className="page-md" style={{ margin: "0 auto", padding: "48px 24px" }}>
       <div className="page-title anim-fade-up">
         <h1>🎁 Refer & Earn</h1>
-        <p>Invite friends to NourishAI and earn free plan extensions and meal plan credits</p>
+        <p>Invite friends to Mitabhukta and earn free plan extensions and meal plan credits</p>
       </div>
 
       {/* Your referral link */}
@@ -104,7 +104,7 @@ export default function Referral({ navigate }) {
           <div className="stat-card">
             <div className="label">Friends Referred</div>
             <div className="value">{totalReferrals}</div>
-            <div className="sub">joined NourishAI</div>
+            <div className="sub">joined Mitabhukta</div>
           </div>
           <div className="stat-card" style={{ background: "#f0fdf4" }}>
             <div className="label">Rewards Earned</div>
@@ -145,7 +145,7 @@ export default function Referral({ navigate }) {
         <h3 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 16 }}>How It Works</h3>
         {[
           { step: "1", title: "Share your link", desc: "Send your unique referral link or code to friends and family." },
-          { step: "2", title: "Friend signs up", desc: "Your friend creates a NourishAI account using your referral link." },
+          { step: "2", title: "Friend signs up", desc: "Your friend creates a Mitabhukta account using your referral link." },
           { step: "3", title: "Both get rewarded", desc: "Your friend gets their first plan free. You unlock milestone rewards!" },
           { step: "4", title: "Keep earning", desc: "The more friends you refer, the bigger the rewards. No limit!" },
         ].map(item => (

@@ -9,7 +9,7 @@ export function Footer({ navigate }) {
       <div style={{ maxWidth: 1120, margin: "0 auto" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 32, marginBottom: 40 }}>
           <div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, marginBottom: 10 }}>🥗 NourishAI</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, marginBottom: 10 }}>🥗 Mitabhukta</div>
             <p style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", lineHeight: 1.7 }}>
               AI-powered meal planning for every age group and dietary need.
             </p>
@@ -41,7 +41,7 @@ export function Footer({ navigate }) {
                 ["Platform Guidelines", "guidelines"],
                 ["Privacy Policy",      "privacy"],
                 ["Terms of Service",    "terms"],
-                ["Contact Support",     "mailto:support@nourishai.com"],
+                ["Contact Support",     "mailto:support@mitabhukta.com"],
               ],
             },
           ].map(col => (
@@ -68,7 +68,7 @@ export function Footer({ navigate }) {
 
         <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 20, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
           <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)" }}>
-            © {new Date().getFullYear()} NourishAI. All rights reserved. · Bengaluru, India
+            © {new Date().getFullYear()} Mitabhukta. All rights reserved. · Bengaluru, India
           </p>
           <div style={{ display: "flex", gap: 16 }}>
             {[["Privacy Policy","privacy"],["Terms of Service","terms"],["Guidelines","guidelines"]].map(([label, id]) => (

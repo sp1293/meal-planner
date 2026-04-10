@@ -60,7 +60,7 @@ function PWAInstallBanner() {
       <div style={{ background: "#166534", color: "#fff", borderRadius: 16, padding: "16px 20px", display: "flex", gap: 14, alignItems: "center", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
         <div style={{ fontSize: 32, flexShrink: 0 }}>🥗</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Install NourishAI</div>
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Install Mitabhukta</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>Add to home screen for quick access</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
@@ -108,7 +108,7 @@ function InnerApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  if (loading) return <LoadingSpinner fullPage message="Loading NourishAI..." />;
+  if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
 
   if (role === "trainer" || page === "trainer-portal") {
     return <TrainerPortal navigate={navigate} />;

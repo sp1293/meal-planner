@@ -12,7 +12,7 @@ export default class ErrorBoundary extends Component {
 
   componentDidCatch(error, info) {
     // Log to console in dev — in production plug in Sentry here
-    console.error("NourishAI Error:", error, info);
+    console.error("Mitabhukta Error:", error, info);
   }
 
   render() {
@@ -33,7 +33,7 @@ export default class ErrorBoundary extends Component {
             Something went wrong
           </h1>
           <p style={{ fontSize: 15, color: "#6b7280", lineHeight: 1.7, marginBottom: 28 }}>
-            NourishAI hit an unexpected error. Your data is safe — this is just a display issue.
+            Mitabhukta hit an unexpected error. Your data is safe — this is just a display issue.
           </p>
 
           {/* Error details in dev */}
@@ -60,7 +60,7 @@ export default class ErrorBoundary extends Component {
 
           <p style={{ fontSize: 13, color: "#9ca3af", marginTop: 24 }}>
             Still having issues?{" "}
-            <a href="mailto:support@nourishai.com" style={{ color: "#166534" }}>support@nourishai.com</a>
+            <a href="mailto:support@mitabhukta.com" style={{ color: "#166534" }}>support@mitabhukta.com</a>
           </p>
         </div>
       </div>

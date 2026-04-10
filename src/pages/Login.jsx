@@ -126,7 +126,7 @@ export function LoginPage({ navigate }) {
   }
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to your NourishAI account"
+    <AuthLayout title="Welcome back" subtitle="Sign in to your Mitabhukta account"
       footer={<>Don't have an account? <button onClick={() => navigate("signup")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Sign up free</button></>}>
       {error && <div className="banner banner-error mb-16">{error}</div>}
       <button onClick={handleGoogle} disabled={gLoading}

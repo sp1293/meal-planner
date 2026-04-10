@@ -8,7 +8,7 @@ export default function PrivacyPolicy({ navigate }) {
 
       <div className="card anim-fade-up-2" style={{ marginBottom: 20, background: "var(--primary-pale)", border: "1px solid var(--primary-soft)" }}>
         <p style={{ fontSize: 14, color: "var(--primary-dark)", lineHeight: 1.8 }}>
-          NourishAI ("we", "us", "our") is committed to protecting your personal information.
+          Mitabhukta ("we", "us", "our") is committed to protecting your personal information.
           This Privacy Policy explains how we collect, use, and protect your data when you use our platform,
           in compliance with India's Information Technology Act, 2000 and the IT (Amendment) Act, 2008.
         </p>
@@ -36,7 +36,7 @@ export default function PrivacyPolicy({ navigate }) {
         {
           title: "3. Data Sharing",
           content: [
-            { subtitle: "We Never Sell Your Data", text: "NourishAI does not sell, rent, or trade your personal information to any third party for commercial purposes." },
+            { subtitle: "We Never Sell Your Data", text: "Mitabhukta does not sell, rent, or trade your personal information to any third party for commercial purposes." },
             { subtitle: "Trainers", text: "Trainers can only see your name and session notes for booked sessions. They cannot see your email, phone, or personal details." },
             { subtitle: "Service Providers", text: "We use Firebase (Google) for authentication and data storage, and Anthropic for AI meal planning. These providers have their own privacy policies." },
             { subtitle: "Legal Requirements", text: "We may disclose information if required by Indian law or court order." },
@@ -55,7 +55,7 @@ export default function PrivacyPolicy({ navigate }) {
           content: [
             { subtitle: "Access", text: "You can view all your data in your Account Settings at any time." },
             { subtitle: "Correction", text: "You can update your profile information directly in the app." },
-            { subtitle: "Deletion", text: "You can request deletion of your account and all associated data by emailing support@nourishai.com. We will process your request within 30 days." },
+            { subtitle: "Deletion", text: "You can request deletion of your account and all associated data by emailing support@mitabhukta.com. We will process your request within 30 days." },
             { subtitle: "Data Portability", text: "You can export your meal plans and booking history from the app." },
           ],
         },
@@ -69,7 +69,7 @@ export default function PrivacyPolicy({ navigate }) {
         {
           title: "7. Children's Privacy",
           content: [
-            { subtitle: "Age Requirement", text: "NourishAI is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you believe we have collected data from a child, please contact us immediately." },
+            { subtitle: "Age Requirement", text: "Mitabhukta is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you believe we have collected data from a child, please contact us immediately." },
           ],
         },
         {
@@ -96,9 +96,9 @@ export default function PrivacyPolicy({ navigate }) {
         <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 16 }}>
           Contact our Data Protection Officer at:
         </p>
-        <a href="mailto:privacy@nourishai.com" className="btn btn-primary btn-sm">📧 privacy@nourishai.com</a>
+        <a href="mailto:privacy@mitabhukta.com" className="btn btn-primary btn-sm">📧 privacy@mitabhukta.com</a>
         <p style={{ fontSize: 12, color: "var(--text-4)", marginTop: 16 }}>
-          NourishAI · Bengaluru, Karnataka, India
+          Mitabhukta · Bengaluru, Karnataka, India
         </p>
       </div>
     </div>

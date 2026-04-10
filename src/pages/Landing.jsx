@@ -117,7 +117,7 @@ export default function Landing({ navigate }) {
       <section style={{ padding: "80px 24px", background: "var(--primary-dark)", textAlign: "center" }}>
         <div style={{ maxWidth: 600, margin: "0 auto" }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(28px, 4vw, 44px)", color: "#fff", marginBottom: 16 }}>Start Eating Better Today</h2>
-          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.7)", marginBottom: 32 }}>Join thousands of families planning healthier meals with NourishAI.</p>
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.7)", marginBottom: 32 }}>Join thousands of families planning healthier meals with Mitabhukta.</p>
           <button className="btn btn-lg" onClick={() => navigate("signup")}
             style={{ background: "#4ade80", color: "#052e16", fontWeight: 700 }}>
             Create your free account →
