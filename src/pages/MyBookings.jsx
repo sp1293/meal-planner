@@ -112,7 +112,7 @@ function StarRating({ value, onChange, readonly }) {
 
 export default function MyBookings({ navigate }) {
   const { profile } = useAuth();
-  const STORAGE_KEY = `nourishai_bookings_${profile?.uid || "guest"}`;
+  const STORAGE_KEY = `mitabhukta_bookings_${profile?.uid || "guest"}`;
 
   const [myBookings, setMyBookings] = useState(() => {
     try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : []; }

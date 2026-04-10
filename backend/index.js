@@ -7,7 +7,7 @@ const app = express();
 
 // ── CORS — only allow your actual domains ──────────────────────────────────
 const ALLOWED_ORIGINS = [
-  "https://meal-planner-ten-taupe.vercel.app",
+  "https://mitabhukta.com",
   "http://localhost:3000",
 ];
 
@@ -72,7 +72,7 @@ function sanitizeString(str, maxLen = 500) {
 
 // ── Health check ───────────────────────────────────────────────────────────
 app.get("/", (req, res) => {
-  res.json({ status: "NourishAI backend running", version: "2.0" });
+  res.json({ status: "Mitabhukta backend running", version: "2.0" });
 });
 
 // ── AI Meal Plan — 10 requests per minute per IP ──────────────────────────
@@ -168,4 +168,4 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`NourishAI backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Mitabhukta backend running on port ${PORT}`));

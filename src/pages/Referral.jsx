@@ -17,7 +17,7 @@ export default function Referral({ navigate }) {
 
   // Generate unique referral code based on uid
   const referralCode = `NOURISH-${(user?.uid || "").slice(0, 6).toUpperCase()}`;
-  const referralLink = `https://meal-planner-ten-taupe.vercel.app/?ref=${referralCode}`;
+  const referralLink = `https://mitabhukta.com/?ref=${referralCode}`;
 
   const totalReferrals = referrals.length;
   const nextMilestone  = REWARDS.find(r => r.referrals > totalReferrals) || REWARDS[REWARDS.length - 1];

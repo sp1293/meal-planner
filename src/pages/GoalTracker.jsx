@@ -25,8 +25,8 @@ function formatShortDate(iso) {
 
 export default function GoalTracker({ navigate }) {
   const { profile } = useAuth();
-  const STORAGE_KEY  = `nourishai_goals_${profile?.uid || "guest"}`;
-  const LOG_KEY      = `nourishai_goal_logs_${profile?.uid || "guest"}`;
+  const STORAGE_KEY  = `mitabhukta_goals_${profile?.uid || "guest"}`;
+  const LOG_KEY      = `mitabhukta_goal_logs_${profile?.uid || "guest"}`;
   const chartRef     = useRef(null);
   const chartRef2    = useRef(null);
 

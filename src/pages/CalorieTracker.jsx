@@ -32,7 +32,7 @@ function formatDate(iso) {
 
 export default function CalorieTracker({ navigate }) {
   const { profile } = useAuth();
-  const STORAGE_KEY = `nourishai_calories_${profile?.uid || "guest"}`;
+  const STORAGE_KEY = `mitabhukta_calories_${profile?.uid || "guest"}`;
   const photoRef    = useRef(null);
 
   const [data, setData] = useState(() => {
@@ -49,7 +49,7 @@ export default function CalorieTracker({ navigate }) {
   const [photoError,    setPhotoError]    = useState("");
   const [photoResult,   setPhotoResult]   = useState(null); // detected items from AI
   const [calorieTarget, setCalorieTarget] = useState(() => {
-    try { return parseInt(localStorage.getItem(`nourishai_cal_target_${profile?.uid}`) || "2000"); }
+    try { return parseInt(localStorage.getItem(`mitabhukta_cal_target_${profile?.uid}`) || "2000"); }
     catch { return 2000; }
   });
   const [editingTarget, setEditingTarget] = useState(false);
@@ -222,7 +222,7 @@ Be realistic with Indian food portions. If you cannot identify the food clearly,
     const t = parseInt(tempTarget);
     if (!isNaN(t) && t > 0) {
       setCalorieTarget(t);
-      localStorage.setItem(`nourishai_cal_target_${profile?.uid}`, t);
+      localStorage.setItem(`mitabhukta_cal_target_${profile?.uid}`, t);
     }
     setEditingTarget(false);
   }

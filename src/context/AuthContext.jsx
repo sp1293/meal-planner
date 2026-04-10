@@ -122,7 +122,7 @@ export function AuthProvider({ children }) {
     // Send email verification
     try {
       await sendEmailVerification(cred.user, {
-        url: "https://meal-planner-ten-taupe.vercel.app",
+        url: "https://mitabhukta.com",
       });
     } catch {
       // Non-fatal — continue even if verification email fails

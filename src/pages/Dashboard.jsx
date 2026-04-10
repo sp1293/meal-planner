@@ -14,7 +14,7 @@ export default function Dashboard({ navigate }) {
   const tierInfo = TIERS[plan.id];
 
   // Load bookings from localStorage
-  const STORAGE_KEY = `nourishai_bookings_${profile?.uid || "guest"}`;
+  const STORAGE_KEY = `mitabhukta_bookings_${profile?.uid || "guest"}`;
   let upcomingBookings = [];
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
