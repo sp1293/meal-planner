@@ -1,31 +1,37 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import "./styles/global.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SubProvider } from "./context/SubContext";
 
-import Navbar        from "./components/Navbar";
+import Navbar         from "./components/Navbar";
 import { Footer, ProtectedRoute, LoadingSpinner } from "./components";
 
-import Landing       from "./pages/Landing";
+// ── Eager — critical path (landing + auth screens load instantly) ──────────
+import Landing              from "./pages/Landing";
 import { LoginPage, SignupPage } from "./pages/Login";
-import Dashboard     from "./pages/Dashboard";
-import MealPlanner   from "./pages/MealPlanner";
-import { MyPlansPage, AccountPage, SubscriptionPage } from "./pages/OtherPages";
-import Trainers      from "./pages/Trainers";
-import MyBookings    from "./pages/MyBookings";
-import Guidelines    from "./pages/Guidelines";
-import AdminPanel    from "./pages/AdminPanel";
-import TrainerPortal from "./pages/TrainerPortal";
-import Referral      from "./pages/Referral";
-import CalorieTracker from "./pages/CalorieTracker";
-import GoalTracker   from "./pages/GoalTracker";
-import LeftoverChef  from "./pages/LeftoverChef";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import TermsOfService from "./pages/TermsOfService";
-import NotFound      from "./pages/NotFound";
 
-// ── PWA Install prompt ─────────────────────────────────────────────────────
+// ── Lazy — authenticated pages load only when first visited ───────────────
+// Named exports need the .then(m => ({ default: m.X })) pattern for lazy().
+const Dashboard      = lazy(() => import("./pages/Dashboard"));
+const MealPlanner    = lazy(() => import("./pages/MealPlanner"));
+const MyPlansPage    = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.MyPlansPage })));
+const AccountPage    = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.AccountPage })));
+const SubscriptionPage = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.SubscriptionPage })));
+const Trainers       = lazy(() => import("./pages/Trainers"));
+const MyBookings     = lazy(() => import("./pages/MyBookings"));
+const Guidelines     = lazy(() => import("./pages/Guidelines"));
+const AdminPanel     = lazy(() => import("./pages/AdminPanel"));
+const TrainerPortal  = lazy(() => import("./pages/TrainerPortal"));
+const Referral       = lazy(() => import("./pages/Referral"));
+const CalorieTracker = lazy(() => import("./pages/CalorieTracker"));
+const GoalTracker    = lazy(() => import("./pages/GoalTracker"));
+const LeftoverChef   = lazy(() => import("./pages/LeftoverChef"));
+const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const NotFound       = lazy(() => import("./pages/NotFound"));
+
+// ── PWA Install Banner ─────────────────────────────────────────────────────
 function PWAInstallBanner() {
   const [prompt, setPrompt] = useState(null);
   const [show,   setShow]   = useState(false);
@@ -34,9 +40,7 @@ function PWAInstallBanner() {
     const handler = (e) => {
       e.preventDefault();
       setPrompt(e);
-      // Show banner only if user hasn't dismissed before
-      const dismissed = localStorage.getItem("pwa_dismissed");
-      if (!dismissed) setShow(true);
+      if (!localStorage.getItem("pwa_dismissed")) setShow(true);
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
@@ -58,77 +62,100 @@ function PWAInstallBanner() {
   return (
     <div style={{ position: "fixed", bottom: 20, left: 20, right: 20, zIndex: 9999, maxWidth: 400, margin: "0 auto" }}>
       <div style={{ background: "#166534", color: "#fff", borderRadius: 16, padding: "16px 20px", display: "flex", gap: 14, alignItems: "center", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-        <div style={{ fontSize: 32, flexShrink: 0 }}>🥗</div>
+        <img src="/logo192.png" alt="" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Install Mitabhukta</div>
           <div style={{ fontSize: 12, opacity: 0.85 }}>Add to home screen for quick access</div>
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          <button onClick={install}
-            style={{ padding: "8px 16px", background: "#fff", color: "#166534", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            Install
-          </button>
-          <button onClick={dismiss}
-            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 20, cursor: "pointer", padding: 0 }}>
-            ✕
-          </button>
+          <button onClick={install} style={{ padding: "8px 16px", background: "#fff", color: "#166534", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Install</button>
+          <button onClick={dismiss} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 20, cursor: "pointer", padding: 0 }}>✕</button>
         </div>
       </div>
     </div>
   );
 }
 
-function InnerApp() {
-  const { user, profile, loading, role } = useAuth();
-  const [page, setPage] = useState("landing");
+// ── Public pages — always accessible ──────────────────────────────────────
+const PUBLIC_PAGES = ["landing", "login", "signup", "guidelines", "privacy", "terms"];
 
-  useEffect(() => {
-    if (!loading) {
-      if (profile) {
-        if (role === "trainer" && page !== "trainer-portal") {
-          setPage("trainer-portal");
-        } else if (role === "admin" && ["landing","login","signup"].includes(page)) {
-          setPage("admin");
-        } else if (role === "student" && ["landing","login","signup"].includes(page)) {
-          setPage("dashboard");
-        }
-      }
-      if (!user && !profile && [
-        "dashboard","planner","my-plans","account","subscription",
-        "trainers","my-bookings","referral","admin","trainer-portal",
-        "calories","goals","leftover-chef",
-      ].includes(page)) {
-        setPage("landing");
-      }
-    }
-  }, [user, profile, loading, role]);
+// ── Protected pages — need login ───────────────────────────────────────────
+const PROTECTED_PAGES = [
+  "dashboard","planner","my-plans","account","subscription",
+  "trainers","my-bookings","referral","admin","trainer-portal",
+  "calories","goals","leftover-chef",
+];
+
+function InnerApp() {
+  const { user, loading, role } = useAuth();
+  const [page, setPage] = useState("landing");
+  // True after the very first Firebase session resolution (handles page-refresh
+  // with an existing session). Subsequent logins are handled by the login
+  // handlers themselves — this flag prevents the effect from racing with them.
+  const sessionChecked = useRef(false);
 
   function navigate(p) {
     setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  useEffect(() => {
+    if (loading) return;
+
+    if (user) {
+      // Only auto-redirect on the very first check (e.g. page refresh with
+      // an existing session). After that, login handlers drive navigation so
+      // we don't override sub-screens like Google prefs.
+      if (!sessionChecked.current && PUBLIC_PAGES.includes(page)) {
+        setPage("dashboard");
+      }
+      sessionChecked.current = true;
+      return;
+    }
+
+    // ── Logged out ───────────────────────────────────────────────────────
+    sessionChecked.current = true;
+    if (PROTECTED_PAGES.includes(page)) {
+      setPage("landing");
+    }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, loading]); // role/profile intentionally omitted — they load async
+
+  // Show loading spinner while Firebase resolves auth state
   if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
 
-  if (role === "trainer" || page === "trainer-portal") {
+  // Trainer always sees trainer portal
+  if (user && role === "trainer") {
     return <TrainerPortal navigate={navigate} />;
   }
 
-  const showFooter  = !["login","signup","trainer-portal"].includes(page);
-  const showNavbar  = !["trainer-portal"].includes(page);
+  const showNavbar = page !== "trainer-portal";
+  const showFooter = !["login", "signup", "trainer-portal"].includes(page);
 
   const renderPage = () => {
+    // ── Auth pages — redirect to dashboard if already logged in ────────
+    if (["landing", "login", "signup"].includes(page)) {
+      if (user) return <Dashboard navigate={navigate} />;
+    }
+
     switch (page) {
-      case "landing":        return (user && profile) ? <Dashboard navigate={navigate} /> : <Landing navigate={navigate} />;
-      case "login":          return (user && profile) ? <Dashboard navigate={navigate} /> : <LoginPage navigate={navigate} />;
-      case "signup":         return (user && profile) ? <Dashboard navigate={navigate} /> : <SignupPage navigate={navigate} />;
-      case "guidelines":     return <Guidelines navigate={navigate} />;
-      case "privacy":        return <PrivacyPolicy navigate={navigate} />;
-      case "terms":          return <TermsOfService navigate={navigate} />;
+      // Public
+      case "landing":    return <Landing navigate={navigate} />;
+      case "login":      return <LoginPage navigate={navigate} />;
+      case "signup":     return <SignupPage navigate={navigate} />;
+      case "guidelines": return <Guidelines navigate={navigate} />;
+      case "privacy":    return <PrivacyPolicy navigate={navigate} />;
+      case "terms":      return <TermsOfService navigate={navigate} />;
+
+      // Trainer
       case "trainer-portal": return <TrainerPortal navigate={navigate} />;
 
+      // Protected — admin
       case "admin":
         return <ProtectedRoute navigate={navigate}><AdminPanel navigate={navigate} /></ProtectedRoute>;
+
+      // Protected — student
       case "dashboard":
         return <ProtectedRoute navigate={navigate}><Dashboard navigate={navigate} /></ProtectedRoute>;
       case "planner":
@@ -160,7 +187,11 @@ function InnerApp() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {showNavbar && <Navbar page={page} navigate={navigate} />}
-      <main style={{ flex: 1 }}>{renderPage()}</main>
+      <main style={{ flex: 1 }}>
+        <Suspense fallback={<LoadingSpinner fullPage />}>
+          {renderPage()}
+        </Suspense>
+      </main>
       {showFooter && <Footer navigate={navigate} />}
       <PWAInstallBanner />
     </div>

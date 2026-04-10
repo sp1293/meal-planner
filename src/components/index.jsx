@@ -90,7 +90,7 @@ export function ProtectedRoute({ children, navigate }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingSpinner fullPage />;
   if (!user) {
-    setTimeout(() => navigate("login"), 0);
+    setTimeout(() => navigate("landing"), 0);
     return <LoadingSpinner fullPage />;
   }
   return children;

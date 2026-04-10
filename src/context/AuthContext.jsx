@@ -145,8 +145,12 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle() {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
+      // Check BEFORE creating the doc so we know if gender is already set.
+      // Don't rely on context `profile` — it's stale in the calling component.
+      const snap = await getDoc(doc(db, "users", cred.user.uid));
+      const needsPrefs = !snap.exists() || !snap.data()?.gender;
       await createUserDoc(cred.user);
-      return cred.user;
+      return { user: cred.user, needsPrefs };
     } catch (err) {
       if (
         err.code === "auth/popup-closed-by-user" ||

@@ -129,7 +129,13 @@ function GooglePreferences({ navigate }) {
   const [gender,  setGender]  = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
+  const [done,    setDone]    = useState(false); // prevents re-render loop
   const name = profile?.displayName?.split(" ")[0] || "there";
+
+  // If already saved, go to dashboard immediately
+  useEffect(() => {
+    if (done) navigate("dashboard");
+  }, [done]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -137,10 +143,11 @@ function GooglePreferences({ navigate }) {
     setLoading(true);
     try {
       await updateUserProfile({ gender });
-      navigate("dashboard");
+      setDone(true); // use local flag instead of checking profile
     } catch {
       setError("Something went wrong. Please try again.");
-    } finally { setLoading(false); }
+      setLoading(false);
+    }
   }
 
   return (
@@ -182,7 +189,7 @@ function GooglePreferences({ navigate }) {
 
 // ── Login Page ────────────────────────────────────────────────────────────────
 export function LoginPage({ navigate }) {
-  const { loginWithEmail, loginWithGoogle, profile } = useAuth();
+  const { loginWithEmail, loginWithGoogle } = useAuth();
   const [email,      setEmail]      = useState("");
   const [password,   setPassword]   = useState("");
   const [showPw,     setShowPw]     = useState(false);
@@ -194,7 +201,8 @@ export function LoginPage({ navigate }) {
   // Route to sub-screens
   if (screen === "forgot")  return <ForgotPasswordScreen onBack={() => setScreen("login")} />;
   if (screen === "verify")  return <VerifyEmailScreen email={email} password={password} navigate={(p) => p === "login" ? setScreen("login") : navigate(p)} />;
-  if (screen === "prefs" || (profile && !profile.gender)) return <GooglePreferences navigate={navigate} />;
+  // Only show prefs if explicitly triggered by Google login — not on every render
+  if (screen === "prefs")   return <GooglePreferences navigate={navigate} />;
 
   async function handleEmail(e) {
     e.preventDefault();
@@ -214,8 +222,8 @@ export function LoginPage({ navigate }) {
   async function handleGoogle() {
     setGLoading(true); setError("");
     try {
-      const u = await loginWithGoogle();
-      if (u && !profile?.gender) {
+      const { needsPrefs } = await loginWithGoogle();
+      if (needsPrefs) {
         setScreen("prefs");
       } else {
         navigate("dashboard");
@@ -300,7 +308,8 @@ export function SignupPage({ navigate }) {
   const [savedPass,  setSavedPass]  = useState("");
 
   if (screen === "verify") return <VerifyEmailScreen email={savedEmail} password={savedPass} navigate={(p) => p === "login" ? navigate("login") : navigate(p)} />;
-  if (screen === "prefs" || (profile && !profile.gender)) return <GooglePreferences navigate={navigate} />;
+  // Only show prefs if explicitly triggered — not on every render
+  if (screen === "prefs")  return <GooglePreferences navigate={navigate} />;
 
   function getStrength(pw) {
     if (!pw) return { score: 0, label: "", color: "var(--border)" };

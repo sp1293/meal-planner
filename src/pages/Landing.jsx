@@ -1,7 +1,23 @@
+import { useEffect, useRef } from "react";
 import { TIERS } from "../config";
 import { PricingCard } from "../components";
+import { getVariant, logImpression, logClick } from "../utils/abTest";
+
+const HERO_CTA_TEST = "hero-cta-v1";
+
+const CTA_VARIANTS = {
+  A: { label: "Get Started Free",           style: { background: "#4ade80", color: "#052e16" } },
+  B: { label: "Plan My First Meal Free →",  style: { background: "#f97316", color: "#fff"    } },
+};
 
 export default function Landing({ navigate }) {
+  const ctaVariant = useRef(getVariant(HERO_CTA_TEST)).current;
+  const cta = CTA_VARIANTS[ctaVariant];
+
+  useEffect(() => {
+    logImpression(HERO_CTA_TEST, ctaVariant);
+  }, [ctaVariant]);
+
   const features = [
     { icon: "🧒", title: "Every Age Group",     desc: "Tailored plans for Kids, Teens, Adults and Seniors — each with age-specific nutrition and portion guidance." },
     { icon: "🤖", title: "Powered by Claude Opus", desc: "The most advanced AI model generates deeply personalized, nutritionally balanced meal plans in seconds." },
@@ -32,9 +48,10 @@ export default function Landing({ navigate }) {
             AI-generated weekly meal plans tailored for kids, teens, adults, and seniors — with smart shopping lists and nutrition analysis.
           </p>
           <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-lg" onClick={() => navigate("signup")}
-              style={{ background: "#4ade80", color: "#052e16", fontWeight: 700, fontSize: 16 }}>
-              Start free — no card needed →
+            <button className="btn btn-lg"
+              style={{ ...cta.style, fontWeight: 700, fontSize: 16 }}
+              onClick={() => { logClick(HERO_CTA_TEST, ctaVariant); navigate("signup"); }}>
+              {cta.label}
             </button>
             <button className="btn btn-lg btn-ghost" onClick={() => navigate("login")}
               style={{ color: "#fff", borderColor: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.08)" }}>

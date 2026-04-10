@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ──────────────────────────────────────────────────────────────
+    // Each authenticated user can read and write only their own document.
+    // No other user — including admins — can access another user's document
+    // from the client. Admin operations must go through the backend (Admin SDK).
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // ── Trainers ───────────────────────────────────────────────────────────
+    // Trainer profiles are readable without auth so the login fallback in
+    // AuthContext can check whether an email belongs to a trainer before
+    // Firebase auth resolves. Writes are blocked from the client entirely —
+    // trainer records are managed via the Admin SDK / backend only.
+    //
+    // ⚠️  SECURITY NOTE: trainer documents currently contain a plain-text
+    // `password` field used for custom trainer auth. This is readable by any
+    // browser. Before scaling to production, move trainer authentication
+    // server-side (e.g. a /api/trainer-login endpoint) and remove the
+    // password field from these client-readable documents.
+    match /trainers/{trainerId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
+    // ── Default deny ───────────────────────────────────────────────────────
+    // Any collection not listed above is fully locked down. This catches
+    // accidental new collections before they have explicit rules.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
