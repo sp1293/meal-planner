@@ -4,6 +4,7 @@ import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useSub } from "../context/SubContext";
 import { callAI, API_URL, AGE_GROUPS, DIET_OPTIONS, CUISINE_OPTIONS, HEALTH_GOALS } from "../config";
+import { trackMealPlanGenerated } from "../utils/analytics";
 import { AgeGroupSelector, MealCard } from "../components";
 
 const DEFAULT_PREFS = {
@@ -217,6 +218,7 @@ Respond ONLY with valid JSON (no markdown, no backticks):
       const parsed  = JSON.parse(result.replace(/```json|```/g, "").trim());
       setMealPlan(parsed);
       setActiveDay(parsed.days[0]?.day || "Monday");
+      trackMealPlanGenerated();
       if (user && plan.plansPerMonth < 999) {
         await updateDoc(doc(db, "users", user.uid), { plansUsed: increment(1) });
         await updateUserProfile({ plansUsed: plansUsed + 1 });

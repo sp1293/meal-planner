@@ -30,7 +30,7 @@ function formatDate(iso) {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 }
 
-export default function CalorieTracker({ navigate }) {
+export default function CalorieTracker() {
   const { profile } = useAuth();
   const STORAGE_KEY = `mitabhukta_calories_${profile?.uid || "guest"}`;
   const photoRef    = useRef(null);
@@ -282,7 +282,7 @@ Be realistic with Indian food portions. If you cannot identify the food clearly,
         </div>
 
         {/* Calorie ring + stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: 24, alignItems: "center", marginBottom: 16 }}>
+        <div className="calorie-ring-grid">
           <div style={{ position: "relative", width: 120, height: 120 }}>
             <svg width="120" height="120" viewBox="0 0 120 120">
               <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" strokeWidth="10" />

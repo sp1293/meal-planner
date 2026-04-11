@@ -66,7 +66,7 @@ export default function Navbar({ page, navigate }) {
 
   const s = {
     nav:        { position: "sticky", top: 0, zIndex: 200, background: "rgba(255,255,255,0.95)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)", boxShadow: "var(--shadow-xs)" },
-    inner:      { maxWidth: 1120, margin: "0 auto", padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between" },
+    inner:      { maxWidth: 1120, margin: "0 auto", padding: "0 24px", height: 64, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 },
     brand:      { display: "flex", alignItems: "center", gap: 10, cursor: "pointer" },
     brandName:  { fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 700, color: "var(--primary-dark)" },
     links:      { display: "flex", alignItems: "center", gap: 4 },
@@ -85,7 +85,7 @@ export default function Navbar({ page, navigate }) {
 
   return (
     <nav style={s.nav}>
-      <div style={s.inner}>
+      <div style={s.inner} className="navbar-inner">
 
         {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>

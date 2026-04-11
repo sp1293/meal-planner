@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { trackSignup } from "../utils/analytics";
 
 // ── Shared layout wrapper ─────────────────────────────────────────────────────
 function AuthLayout({ children, title, subtitle, footer }) {
@@ -135,7 +136,7 @@ function GooglePreferences({ navigate }) {
   // If already saved, go to dashboard immediately
   useEffect(() => {
     if (done) navigate("dashboard");
-  }, [done]);
+  }, [done, navigate]);
 
   async function handleSave(e) {
     e.preventDefault();
@@ -292,7 +293,7 @@ export function LoginPage({ navigate }) {
 
 // ── Signup Page ───────────────────────────────────────────────────────────────
 export function SignupPage({ navigate }) {
-  const { signupWithEmail, loginWithGoogle, profile } = useAuth();
+  const { signupWithEmail, loginWithGoogle } = useAuth();
   const [name,       setName]       = useState("");
   const [email,      setEmail]      = useState("");
   const [password,   setPassword]   = useState("");
@@ -338,6 +339,7 @@ export function SignupPage({ navigate }) {
     setLoading(true); setError("");
     try {
       await signupWithEmail(email, password, name, { gender });
+      trackSignup("email");
       setSavedEmail(email);
       setSavedPass(password);
       setScreen("verify");
@@ -351,6 +353,7 @@ export function SignupPage({ navigate }) {
     setGLoading(true); setError("");
     try {
       await loginWithGoogle();
+      trackSignup("google");
       setScreen("prefs");
     } catch (err) {
       setError(friendlyError(err.code));

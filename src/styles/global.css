@@ -217,12 +217,32 @@ textarea.form-control { resize: vertical; line-height: 1.6; }
 ::-webkit-scrollbar-track { background:transparent; }
 ::-webkit-scrollbar-thumb { background:var(--border-2); border-radius:3px; }
 
+/* ─── Calorie ring + stats layout ────────────────────────────────────────────── */
+/* Used by CalorieTracker — stacks ring and macros vertically on small screens  */
+.calorie-ring-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+@media (max-width: 480px) {
+  .calorie-ring-grid {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .calorie-ring-grid > div:last-child {
+    width: 100%;
+  }
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────────── */
 @media (max-width:768px) {
   .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; }
   .page,.page-sm,.page-md { padding:28px 16px; }
   .hide-mobile { display:none !important; }
   .card { padding:20px; }
+  .navbar-inner { padding:0 16px !important; }
 }
 @media (max-width:480px) {
   .btn-lg { padding:13px 20px; font-size:15px; }

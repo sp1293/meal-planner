@@ -185,11 +185,16 @@ export async function callAI(prompt, systemPrompt = "") {
   };
   if (systemPrompt) body.system = systemPrompt;
 
-  const res = await fetch(API_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res;
+  try {
+    res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new Error("Network error — please check your connection and try again.");
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));

@@ -1,35 +1,29 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect } from "react";
 import "./styles/global.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SubProvider } from "./context/SubContext";
 
 import Navbar         from "./components/Navbar";
-import { Footer, ProtectedRoute, LoadingSpinner } from "./components";
+import { Footer, LoadingSpinner } from "./components";
 
-// ── Eager — critical path (landing + auth screens load instantly) ──────────
-import Landing              from "./pages/Landing";
+import Landing        from "./pages/Landing";
 import { LoginPage, SignupPage } from "./pages/Login";
-
-// ── Lazy — authenticated pages load only when first visited ───────────────
-// Named exports need the .then(m => ({ default: m.X })) pattern for lazy().
-const Dashboard      = lazy(() => import("./pages/Dashboard"));
-const MealPlanner    = lazy(() => import("./pages/MealPlanner"));
-const MyPlansPage    = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.MyPlansPage })));
-const AccountPage    = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.AccountPage })));
-const SubscriptionPage = lazy(() => import("./pages/OtherPages").then(m => ({ default: m.SubscriptionPage })));
-const Trainers       = lazy(() => import("./pages/Trainers"));
-const MyBookings     = lazy(() => import("./pages/MyBookings"));
-const Guidelines     = lazy(() => import("./pages/Guidelines"));
-const AdminPanel     = lazy(() => import("./pages/AdminPanel"));
-const TrainerPortal  = lazy(() => import("./pages/TrainerPortal"));
-const Referral       = lazy(() => import("./pages/Referral"));
-const CalorieTracker = lazy(() => import("./pages/CalorieTracker"));
-const GoalTracker    = lazy(() => import("./pages/GoalTracker"));
-const LeftoverChef   = lazy(() => import("./pages/LeftoverChef"));
-const PrivacyPolicy  = lazy(() => import("./pages/PrivacyPolicy"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
-const NotFound       = lazy(() => import("./pages/NotFound"));
+import Dashboard      from "./pages/Dashboard";
+import MealPlanner    from "./pages/MealPlanner";
+import { MyPlansPage, AccountPage, SubscriptionPage } from "./pages/OtherPages";
+import Trainers       from "./pages/Trainers";
+import MyBookings     from "./pages/MyBookings";
+import Guidelines     from "./pages/Guidelines";
+import AdminPanel     from "./pages/AdminPanel";
+import TrainerPortal  from "./pages/TrainerPortal";
+import Referral       from "./pages/Referral";
+import CalorieTracker from "./pages/CalorieTracker";
+import GoalTracker    from "./pages/GoalTracker";
+import LeftoverChef   from "./pages/LeftoverChef";
+import PrivacyPolicy  from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
+import NotFound       from "./pages/NotFound";
 
 // ── PWA Install Banner ─────────────────────────────────────────────────────
 function PWAInstallBanner() {
@@ -50,13 +44,8 @@ function PWAInstallBanner() {
 
   async function install() {
     prompt.prompt();
-    const result = await prompt.userChoice;
-    if (result.outcome === "accepted") setShow(false);
-  }
-
-  function dismiss() {
-    localStorage.setItem("pwa_dismissed", "1");
-    setShow(false);
+    const { outcome } = await prompt.userChoice;
+    if (outcome === "accepted") setShow(false);
   }
 
   return (
@@ -69,78 +58,79 @@ function PWAInstallBanner() {
         </div>
         <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
           <button onClick={install} style={{ padding: "8px 16px", background: "#fff", color: "#166534", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Install</button>
-          <button onClick={dismiss} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 20, cursor: "pointer", padding: 0 }}>✕</button>
+          <button onClick={() => { localStorage.setItem("pwa_dismissed","1"); setShow(false); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 20, cursor: "pointer", padding: 0 }}>✕</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Public pages — always accessible ──────────────────────────────────────
-const PUBLIC_PAGES = ["landing", "login", "signup", "guidelines", "privacy", "terms"];
+// ── Pages that don't require auth ─────────────────────────────────────────
+const PUBLIC_PAGES = new Set(["landing","login","signup","guidelines","privacy","terms"]);
 
-// ── Protected pages — need login ───────────────────────────────────────────
-const PROTECTED_PAGES = [
+// ── Pages that require auth ────────────────────────────────────────────────
+const PROTECTED_PAGES = new Set([
   "dashboard","planner","my-plans","account","subscription",
   "trainers","my-bookings","referral","admin","trainer-portal",
   "calories","goals","leftover-chef",
-];
+]);
 
 function InnerApp() {
-  const { user, loading, role } = useAuth();
+  const { user, profile, loading, role } = useAuth();
   const [page, setPage] = useState("landing");
-  // True after the very first Firebase session resolution (handles page-refresh
-  // with an existing session). Subsequent logins are handled by the login
-  // handlers themselves — this flag prevents the effect from racing with them.
-  const sessionChecked = useRef(false);
 
   function navigate(p) {
     setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ── Auth-based redirects ───────────────────────────────────────────────────
+  // IMPORTANT: Only depend on `user` and `loading` — NOT `profile` or `page`
+  // profile loads async and causes race conditions if used here
   useEffect(() => {
     if (loading) return;
 
     if (user) {
-      // Only auto-redirect on the very first check (e.g. page refresh with
-      // an existing session). After that, login handlers drive navigation so
-      // we don't override sub-screens like Google prefs.
-      if (!sessionChecked.current && PUBLIC_PAGES.includes(page)) {
-        setPage("dashboard");
-      }
-      sessionChecked.current = true;
-      return;
+      // Logged in — if on a public page, go to the right home page
+      setPage(prev => {
+        if (!PUBLIC_PAGES.has(prev)) return prev; // already on a real page, stay
+        if (role === "trainer") return "trainer-portal";
+        if (role === "admin")   return "admin";
+        return "dashboard";
+      });
+    } else {
+      // Logged out — if on a protected page, go to landing
+      setPage(prev => PROTECTED_PAGES.has(prev) ? "landing" : prev);
     }
-
-    // ── Logged out ───────────────────────────────────────────────────────
-    sessionChecked.current = true;
-    if (PROTECTED_PAGES.includes(page)) {
-      setPage("landing");
-    }
-
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loading]); // role/profile intentionally omitted — they load async
+  }, [user, loading]);
+  // NOTE: `role` intentionally omitted — role changes only after
+  // profile loads which is a separate concern handled in renderPage
 
-  // Show loading spinner while Firebase resolves auth state
   if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
 
-  // Trainer always sees trainer portal
+  // ── Trainer shortcut ───────────────────────────────────────────────────────
   if (user && role === "trainer") {
     return <TrainerPortal navigate={navigate} />;
   }
 
   const showNavbar = page !== "trainer-portal";
-  const showFooter = !["login", "signup", "trainer-portal"].includes(page);
+  const showFooter = !["login","signup","trainer-portal"].includes(page);
 
-  const renderPage = () => {
-    // ── Auth pages — redirect to dashboard if already logged in ────────
-    if (["landing", "login", "signup"].includes(page)) {
-      if (user) return <Dashboard navigate={navigate} />;
+  // ── Page renderer ──────────────────────────────────────────────────────────
+  function renderPage() {
+    // If logged in and somehow still on a public page, show dashboard
+    if (user && PUBLIC_PAGES.has(page)) {
+      return <Dashboard navigate={navigate} />;
+    }
+
+    // If logged out and on a protected page, show landing
+    if (!user && PROTECTED_PAGES.has(page)) {
+      return <Landing navigate={navigate} />;
     }
 
     switch (page) {
-      // Public
+      // ── Public ──────────────────────────────────────────────────────────
       case "landing":    return <Landing navigate={navigate} />;
       case "login":      return <LoginPage navigate={navigate} />;
       case "signup":     return <SignupPage navigate={navigate} />;
@@ -148,50 +138,35 @@ function InnerApp() {
       case "privacy":    return <PrivacyPolicy navigate={navigate} />;
       case "terms":      return <TermsOfService navigate={navigate} />;
 
-      // Trainer
+      // ── Trainer ─────────────────────────────────────────────────────────
       case "trainer-portal": return <TrainerPortal navigate={navigate} />;
 
-      // Protected — admin
+      // ── Admin ────────────────────────────────────────────────────────────
       case "admin":
-        return <ProtectedRoute navigate={navigate}><AdminPanel navigate={navigate} /></ProtectedRoute>;
+        if (role !== "admin") return <Dashboard navigate={navigate} />;
+        return <AdminPanel navigate={navigate} />;
 
-      // Protected — student
-      case "dashboard":
-        return <ProtectedRoute navigate={navigate}><Dashboard navigate={navigate} /></ProtectedRoute>;
-      case "planner":
-        return <ProtectedRoute navigate={navigate}><MealPlanner navigate={navigate} /></ProtectedRoute>;
-      case "my-plans":
-        return <ProtectedRoute navigate={navigate}><MyPlansPage navigate={navigate} /></ProtectedRoute>;
-      case "account":
-        return <ProtectedRoute navigate={navigate}><AccountPage navigate={navigate} /></ProtectedRoute>;
-      case "subscription":
-        return <ProtectedRoute navigate={navigate}><SubscriptionPage navigate={navigate} /></ProtectedRoute>;
-      case "trainers":
-        return <ProtectedRoute navigate={navigate}><Trainers navigate={navigate} /></ProtectedRoute>;
-      case "my-bookings":
-        return <ProtectedRoute navigate={navigate}><MyBookings navigate={navigate} /></ProtectedRoute>;
-      case "referral":
-        return <ProtectedRoute navigate={navigate}><Referral navigate={navigate} /></ProtectedRoute>;
-      case "calories":
-        return <ProtectedRoute navigate={navigate}><CalorieTracker navigate={navigate} /></ProtectedRoute>;
-      case "goals":
-        return <ProtectedRoute navigate={navigate}><GoalTracker navigate={navigate} /></ProtectedRoute>;
-      case "leftover-chef":
-        return <ProtectedRoute navigate={navigate}><LeftoverChef navigate={navigate} /></ProtectedRoute>;
+      // ── Protected student pages ──────────────────────────────────────────
+      case "dashboard":     return <Dashboard navigate={navigate} />;
+      case "planner":       return <MealPlanner navigate={navigate} />;
+      case "my-plans":      return <MyPlansPage navigate={navigate} />;
+      case "account":       return <AccountPage navigate={navigate} />;
+      case "subscription":  return <SubscriptionPage navigate={navigate} />;
+      case "trainers":      return <Trainers navigate={navigate} />;
+      case "my-bookings":   return <MyBookings navigate={navigate} />;
+      case "referral":      return <Referral navigate={navigate} />;
+      case "calories":      return <CalorieTracker navigate={navigate} />;
+      case "goals":         return <GoalTracker navigate={navigate} />;
+      case "leftover-chef": return <LeftoverChef navigate={navigate} />;
 
-      default:
-        return <NotFound navigate={navigate} />;
+      default: return <NotFound navigate={navigate} />;
     }
-  };
+  }
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {showNavbar && <Navbar page={page} navigate={navigate} />}
-      <main style={{ flex: 1 }}>
-        <Suspense fallback={<LoadingSpinner fullPage />}>
-          {renderPage()}
-        </Suspense>
-      </main>
+      <main style={{ flex: 1 }}>{renderPage()}</main>
       {showFooter && <Footer navigate={navigate} />}
       <PWAInstallBanner />
     </div>

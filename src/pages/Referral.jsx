@@ -27,6 +27,19 @@ export default function Referral({ navigate }) {
     navigator.clipboard.writeText(referralLink).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
+    }).catch(() => {
+      // Clipboard API denied (e.g. non-HTTPS or permission blocked) — fall back
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = referralLink;
+        ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      } catch { /* silent — user can copy manually */ }
     });
   }
 

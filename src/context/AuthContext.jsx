@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -9,7 +9,10 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, serverTimestamp, collection, query, where, getDocs } from "firebase/firestore";
+import {
+  doc, setDoc, getDoc, serverTimestamp,
+  collection, query, where, getDocs,
+} from "firebase/firestore";
 import { auth, db, googleProvider } from "../firebase";
 
 const AuthContext = createContext(null);
@@ -23,43 +26,64 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ── This flag prevents onAuthStateChanged from running
+  //    during an intentional signOut inside loginWithEmail ────────────────────
+  const suppressAuthChange = useRef(false);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Skip if we're intentionally signing out mid-login
+      if (suppressAuthChange.current) return;
+
       setUser(firebaseUser);
+
       if (firebaseUser) {
-        const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userSnap.exists()) {
-          const existing = userSnap.data();
-          if (existing.emailVerified !== firebaseUser.emailVerified) {
-            await setDoc(doc(db, "users", firebaseUser.uid),
-              { emailVerified: firebaseUser.emailVerified }, { merge: true });
-          }
-          setProfile({ ...existing, emailVerified: firebaseUser.emailVerified });
-        } else {
-          try {
-            const trainerSnap = await getDocs(
-              query(collection(db, "trainers"), where("email", "==", firebaseUser.email?.toLowerCase()))
-            );
-            if (!trainerSnap.empty) {
-              setProfile({ ...trainerSnap.docs[0].data(), role: "trainer" });
-            } else {
+        try {
+          const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
+          if (userSnap.exists()) {
+            const existing = userSnap.data();
+            // Sync emailVerified if changed
+            if (existing.emailVerified !== firebaseUser.emailVerified) {
+              await setDoc(
+                doc(db, "users", firebaseUser.uid),
+                { emailVerified: firebaseUser.emailVerified },
+                { merge: true }
+              );
+            }
+            setProfile({ ...existing, emailVerified: firebaseUser.emailVerified });
+          } else {
+            // Check trainer collection
+            try {
+              const trainerSnap = await getDocs(
+                query(collection(db, "trainers"), where("email", "==", firebaseUser.email?.toLowerCase()))
+              );
+              if (!trainerSnap.empty) {
+                setProfile({ ...trainerSnap.docs[0].data(), role: "trainer" });
+              } else {
+                setProfile(null);
+              }
+            } catch {
               setProfile(null);
             }
-          } catch {
-            setProfile(null);
           }
+        } catch {
+          // Firestore unreachable — still resolve auth loading
+          setProfile(null);
         }
       } else {
         setProfile(null);
       }
+
       setLoading(false);
     });
     return unsub;
   }, []);
 
+  // ── Create or update user document in Firestore ────────────────────────────
   async function createUserDoc(firebaseUser, extra = {}) {
     const ref  = doc(db, "users", firebaseUser.uid);
     const snap = await getDoc(ref);
+
     if (!snap.exists()) {
       const data = {
         uid:           firebaseUser.uid,
@@ -79,16 +103,19 @@ export function AuthProvider({ children }) {
       };
       await setDoc(ref, data);
       setProfile(data);
+      return data;
     } else {
       const existing = snap.data();
       if (existing.emailVerified !== firebaseUser.emailVerified) {
         await setDoc(ref, { emailVerified: firebaseUser.emailVerified }, { merge: true });
       }
-      setProfile({ ...existing, emailVerified: firebaseUser.emailVerified });
+      const updated = { ...existing, emailVerified: firebaseUser.emailVerified };
+      setProfile(updated);
+      return updated;
     }
   }
 
-  // ── Trainer login ──────────────────────────────────────────────────────────
+  // ── Trainer login (Firestore-based, no Firebase Auth) ──────────────────────
   async function loginAsTrainer(email, password) {
     const snap = await getDocs(
       query(collection(db, "trainers"), where("email", "==", email.toLowerCase()))
@@ -96,25 +123,44 @@ export function AuthProvider({ children }) {
     if (snap.empty) throw new Error("No trainer found with this email.");
     const trainer = snap.docs[0].data();
     if (trainer.password !== password) throw new Error("Incorrect password.");
-    if (trainer.status === "suspended") throw new Error("Your account has been suspended. Contact support@mitabhukta.com.");
+    if (trainer.status === "suspended")
+      throw new Error("Your account has been suspended. Contact support@mitabhukta.com.");
     setProfile({ ...trainer, role: "trainer" });
     return trainer;
   }
 
-  // ── Email login — blocks unverified users ──────────────────────────────────
+  // ── Email login ────────────────────────────────────────────────────────────
+  // KEY FIX: Do NOT call signOut() here. Instead throw a custom error
+  // with the unverified user's credentials so the UI can show the
+  // verify screen without triggering onAuthStateChanged → redirect loop.
   async function loginWithEmail(email, password) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+
       if (!cred.user.emailVerified) {
+        // ── Suppress the signOut from triggering a redirect ──────────────────
+        suppressAuthChange.current = true;
         await signOut(auth);
-        const err = new Error("Please verify your email before signing in.");
+        suppressAuthChange.current = false;
+
+        // Manually clear state
+        setUser(null);
+        setProfile(null);
+
+        const err = new Error("Email not verified.");
         err.code = "auth/email-not-verified";
         throw err;
       }
+
+      // Email is verified — proceed normally
       await createUserDoc(cred.user);
       return { user: cred.user, role: "student" };
+
     } catch (firebaseErr) {
+      // Rethrow our custom error immediately
       if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
+
+      // If Firebase auth fails, try trainer login as fallback
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -124,20 +170,28 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // ── Email signup — sends verification, signs out immediately ───────────────
+  // ── Email signup ───────────────────────────────────────────────────────────
+  // Signs user out AFTER creating the doc, suppressing the auth change
   async function signupWithEmail(email, password, name, extra = {}) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(cred.user, { displayName: sanitize(name) });
+
     try {
       await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
     } catch (e) {
       console.warn("Verification email failed:", e.message);
     }
+
     await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
-    // Sign out immediately — must verify first
+
+    // Suppress redirect — we want the UI to show the verify screen
+    suppressAuthChange.current = true;
     await signOut(auth);
+    suppressAuthChange.current = false;
+
     setUser(null);
     setProfile(null);
+
     return cred.user;
   }
 
@@ -145,12 +199,14 @@ export function AuthProvider({ children }) {
   async function loginWithGoogle() {
     try {
       const cred = await signInWithPopup(auth, googleProvider);
-      // Check BEFORE creating the doc so we know if gender is already set.
-      // Don't rely on context `profile` — it's stale in the calling component.
+
+      // Check if new user (no gender) BEFORE creating doc
       const snap = await getDoc(doc(db, "users", cred.user.uid));
       const needsPrefs = !snap.exists() || !snap.data()?.gender;
+
       await createUserDoc(cred.user);
       return { user: cred.user, needsPrefs };
+
     } catch (err) {
       if (
         err.code === "auth/popup-closed-by-user" ||
@@ -161,7 +217,7 @@ export function AuthProvider({ children }) {
         throw e;
       }
       if (err.code === "auth/popup-blocked") {
-        const e = new Error("Popup was blocked. Please allow popups for mitabhukta.com and try again.");
+        const e = new Error("Popup was blocked. Please allow popups for mitabhukta.com.");
         e.code = "auth/popup-blocked";
         throw e;
       }
@@ -171,9 +227,14 @@ export function AuthProvider({ children }) {
 
   // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
-    await signOut(auth);
+    suppressAuthChange.current = true;
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
+      await signOut(auth);
+    } finally {
+      suppressAuthChange.current = false;
+    }
   }
 
   // ── Password reset ─────────────────────────────────────────────────────────
@@ -181,18 +242,20 @@ export function AuthProvider({ children }) {
     await sendPasswordResetEmail(auth, email, { url: "https://mitabhukta.com" });
   }
 
+  // ── Logout ─────────────────────────────────────────────────────────────────
   async function logout() {
     await signOut(auth);
+    setUser(null);
     setProfile(null);
   }
 
+  // ── Update profile ─────────────────────────────────────────────────────────
   async function updateUserProfile(data) {
     if (!user) return;
     const sanitized = Object.fromEntries(
       Object.entries(data).map(([k, v]) => [k, typeof v === "string" ? sanitize(v) : v])
     );
-    const ref = doc(db, "users", user.uid);
-    await setDoc(ref, sanitized, { merge: true });
+    await setDoc(doc(db, "users", user.uid), sanitized, { merge: true });
     setProfile(p => ({ ...p, ...sanitized }));
   }
 

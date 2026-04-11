@@ -40,10 +40,14 @@ function getCancellationFee(booking) {
 
 function convertTo24(time12) {
   const [time, modifier] = time12.split(" ");
-  let [hours, minutes]   = time.split(":");
-  if (hours === "12") hours = "00";
-  if (modifier === "PM") hours = parseInt(hours, 10) + 12;
-  return `${hours}:${minutes || "00"}:00`;
+  const [hoursStr, minutes] = time.split(":");
+  let h = parseInt(hoursStr, 10);
+  if (modifier === "AM") {
+    if (h === 12) h = 0;        // 12:xx AM → 00:xx (midnight)
+  } else {
+    if (h !== 12) h += 12;      // 12:xx PM stays 12, others add 12
+  }
+  return `${String(h).padStart(2, "0")}:${minutes || "00"}:00`;
 }
 
 // ── Generate .ics calendar file ────────────────────────────────────────────
