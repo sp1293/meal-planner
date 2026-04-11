@@ -2,7 +2,6 @@ import { useAuth } from "../context/AuthContext";
 import { TIERS, AGE_GROUPS } from "../config";
 
 /* ─── Footer ─────────────────────────────────────────────────────────────────── */
-
 export function Footer({ navigate }) {
   return (
     <footer style={{ background: "var(--primary-dark)", color: "#fff", padding: "48px 24px 24px" }}>
@@ -85,14 +84,14 @@ export function Footer({ navigate }) {
   );
 }
 
-/* ─── Protected Route ─────────────────────────────────────────────────────────── */
-export function ProtectedRoute({ children, navigate }) {
+/* ─── Protected Route ─────────────────────────────────────────────────────────
+   FIXED: No longer calls navigate() — App.jsx handles all redirects.
+   This component just shows a spinner while loading, and renders
+   children if user exists. Nothing else. ────────────────────────────────── */
+export function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <LoadingSpinner fullPage />;
-  if (!user) {
-    setTimeout(() => navigate("landing"), 0);
-    return <LoadingSpinner fullPage />;
-  }
+  if (!user)   return <LoadingSpinner fullPage />; // App.jsx will redirect
   return children;
 }
 
@@ -100,12 +99,22 @@ export function ProtectedRoute({ children, navigate }) {
 export function LoadingSpinner({ fullPage, size = 40, message = "" }) {
   const wrap = fullPage ? {
     position: "fixed", inset: 0, background: "rgba(255,255,255,0.9)",
-    display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, zIndex: 999,
-  } : { display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: 40 };
+    display: "flex", flexDirection: "column", alignItems: "center",
+    justifyContent: "center", gap: 16, zIndex: 999,
+  } : {
+    display: "flex", flexDirection: "column", alignItems: "center",
+    gap: 12, padding: 40,
+  };
 
   return (
     <div style={wrap}>
-      <div style={{ width: size, height: size, border: `3px solid var(--border)`, borderTop: `3px solid var(--primary)`, borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+      <div style={{
+        width: size, height: size,
+        border: `3px solid var(--border)`,
+        borderTop: `3px solid var(--primary)`,
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
       {message && <p style={{ fontSize: 14, color: "var(--text-3)" }}>{message}</p>}
     </div>
   );
@@ -118,7 +127,7 @@ export function AgeGroupSelector({ selected, onChange, allowedGroups = Object.ke
       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--text-3)", textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 10 }}>Age Group</label>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
         {Object.values(AGE_GROUPS).map(g => {
-          const allowed = allowedGroups.includes(g.id);
+          const allowed    = allowedGroups.includes(g.id);
           const isSelected = selected === g.id;
           return (
             <button key={g.id}
@@ -177,7 +186,7 @@ export function MealCard({ type, meal }) {
 
 /* ─── Pricing Card ────────────────────────────────────────────────────────────── */
 export function PricingCard({ tierKey, currentTier, onSelect }) {
-  const plan = TIERS[tierKey];
+  const plan      = TIERS[tierKey];
   const isCurrent = currentTier === tierKey;
   const isPopular = plan.popular;
 
@@ -191,9 +200,7 @@ export function PricingCard({ tierKey, currentTier, onSelect }) {
       transform: isPopular ? "scale(1.03)" : "scale(1)",
       transition: "var(--transition)",
     }}>
-      {isPopular && (
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: plan.color }} />
-      )}
+      {isPopular && <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: plan.color }} />}
       {isPopular && (
         <div style={{ position: "absolute", top: 12, right: 12, background: plan.color, color: "#fff", fontSize: 10, fontWeight: 700, padding: "3px 10px", borderRadius: "var(--radius-full)", textTransform: "uppercase", letterSpacing: ".5px" }}>
           Most Popular
@@ -218,7 +225,8 @@ export function PricingCard({ tierKey, currentTier, onSelect }) {
           border: isCurrent ? `1.5px solid ${plan.color}` : "none",
           background: isCurrent ? "transparent" : plan.color,
           color: isCurrent ? plan.color : "#fff",
-          fontSize: 14, fontWeight: 700, cursor: isCurrent ? "default" : "pointer",
+          fontSize: 14, fontWeight: 700,
+          cursor: isCurrent ? "default" : "pointer",
           transition: "var(--transition)", fontFamily: "var(--font-body)",
         }}>
         {isCurrent ? "Current Plan ✓" : `Upgrade to ${plan.name}`}
