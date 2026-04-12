@@ -42,15 +42,12 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Track if we just signed up — so App.jsx knows to show verify screen
-  // instead of dashboard even though user is technically "logged in"
-  const [justSignedUp, setJustSignedUp] = useState(false);
+  const suppressAuthChange = useRef(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (suppressAuthChange.current) return;
       setUser(firebaseUser);
-
       if (firebaseUser) {
         try {
           const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
@@ -81,9 +78,7 @@ export function AuthProvider({ children }) {
         }
       } else {
         setProfile(null);
-        setJustSignedUp(false);
       }
-
       setLoading(false);
     });
     return unsub;
@@ -138,18 +133,28 @@ export function AuthProvider({ children }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      if (!cred.user.emailVerified) {
-        // Sign out cleanly — no suppression needed here since we WANT
-        // the user to stay on the verify screen
+      // ── CRITICAL FIX ──────────────────────────────────────────────────────
+      // Firebase caches the auth token. After user verifies email in another
+      // tab/window, the cached token still shows emailVerified=false.
+      // Call reload() to force Firebase to fetch fresh token from server.
+      await cred.user.reload();
+      const freshUser = auth.currentUser; // get the reloaded user
+
+      if (!freshUser.emailVerified) {
+        suppressAuthChange.current = true;
         await signOut(auth);
+        suppressAuthChange.current = false;
+        setUser(null);
+        setProfile(null);
         const err = new Error("Please verify your email before signing in.");
         err.code = "auth/email-not-verified";
         throw err;
       }
 
-      const profileData = await createUserDoc(cred.user);
+      const profileData = await createUserDoc(freshUser);
       setProfile(profileData);
-      return { user: cred.user, role: "student" };
+      setUser(freshUser);
+      return { user: freshUser, role: "student" };
 
     } catch (firebaseErr) {
       if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
@@ -163,38 +168,27 @@ export function AuthProvider({ children }) {
   }
 
   // ── Email signup ───────────────────────────────────────────────────────────
-  // NEW APPROACH: Don't sign out. Instead set justSignedUp=true so
-  // Login.jsx shows the verify screen even though user is logged in.
-  // App.jsx checks emailVerified before redirecting to dashboard.
   async function signupWithEmail(email, password, name, extra = {}) {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: sanitize(name) });
-
-    // Mark as just signed up BEFORE any auth state changes
-    setJustSignedUp(true);
-
-    // Send Firebase verification email
+    suppressAuthChange.current = true;
     try {
-      await sendEmailVerification(cred.user);
-    } catch (e) {
-      console.warn("Firebase verification email failed:", e.message);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: sanitize(name) });
+
+      // Just use Firebase's own email — it has the real verification link
+try {
+  await sendEmailVerification(cred.user);
+} catch (e) {
+  console.warn("Firebase verification email failed:", e.message);
+}
+// Resend email disabled until we implement Firebase Admin SDK on backend
+
+      await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
+      await signOut(auth);
+    } finally {
+      suppressAuthChange.current = false;
     }
-
-    // Send branded Resend email
-    sendEmail("send-verification", {
-      email,
-      name: sanitize(name),
-      verificationLink: "https://mitabhukta.com",
-    });
-
-    // Save to Firestore
-    const profileData = await createUserDoc(cred.user, {
-      displayName: sanitize(name), ...extra,
-    });
-    setProfile(profileData);
-
-    // Return the user — Login.jsx will show verify screen
-    return cred.user;
+    setUser(null);
+    setProfile(null);
   }
 
   // ── Google login ───────────────────────────────────────────────────────────
@@ -233,9 +227,16 @@ export function AuthProvider({ children }) {
 
   // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    await sendEmailVerification(cred.user);
-    await signOut(auth);
+    suppressAuthChange.current = true;
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await sendEmailVerification(cred.user);
+      await signOut(auth);
+    } finally {
+      suppressAuthChange.current = false;
+    }
+    setUser(null);
+    setProfile(null);
   }
 
   // ── Password reset ─────────────────────────────────────────────────────────
@@ -248,14 +249,12 @@ export function AuthProvider({ children }) {
     });
   }
 
-  // ── Logout ─────────────────────────────────────────────────────────────────
   async function logout() {
     await signOut(auth);
     setUser(null);
     setProfile(null);
   }
 
-  // ── Update profile ─────────────────────────────────────────────────────────
   async function updateUserProfile(data) {
     if (!user) return;
     const sanitized = Object.fromEntries(
@@ -265,16 +264,15 @@ export function AuthProvider({ children }) {
     setProfile(p => ({ ...p, ...sanitized }));
   }
 
-  function clearJustSignedUp() {
-    setJustSignedUp(false);
-  }
+  // no-op kept for compatibility
+  function clearJustSignedUp() {}
 
   const tier = profile?.tier || "free";
   const role = profile?.role || "student";
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, tier, role, justSignedUp,
+      user, profile, loading, tier, role,
       loginWithEmail, signupWithEmail, loginWithGoogle,
       logout, updateUserProfile, resetPassword, resendVerificationEmail,
       clearJustSignedUp,

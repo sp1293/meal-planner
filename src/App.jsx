@@ -27,6 +27,16 @@ import EarlyAccess    from "./pages/EarlyAccess";
 import AuthAction     from "./pages/AuthAction";
 import NotFound       from "./pages/NotFound";
 
+// ── Detect Firebase action link IMMEDIATELY — before any React state ───────
+// Check URL params right when the module loads, not inside a useEffect
+function getInitialPage() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("mode") && params.get("oobCode")) {
+    return "auth-action";
+  }
+  return "landing";
+}
+
 function PWAInstallBanner() {
   const [prompt, setPrompt] = useState(null);
   const [show,   setShow]   = useState(false);
@@ -73,31 +83,21 @@ const PROTECTED_PAGES = new Set([
 ]);
 
 function InnerApp() {
-  const { user, loading, role, justSignedUp } = useAuth();
-  const [page, setPage] = useState("landing");
+  const { user, loading, role } = useAuth();
+
+  // ── Initialize page from URL — catches Firebase action links immediately ──
+  const [page, setPage] = useState(getInitialPage);
 
   function navigate(p) {
     setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // Detect Firebase email action links on first load
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("mode") && params.get("oobCode")) {
-      setPage("auth-action");
-    }
-  }, []);
-
   // Auth-based redirects
   useEffect(() => {
     if (loading) return;
 
-    if (user) {
-      // If user just signed up and email not verified — stay on signup/login page
-      // so the verify screen can show. Don't redirect to dashboard.
-      if (justSignedUp || !user.emailVerified) return;
-
+    if (user && user.emailVerified) {
       setPage(prev => {
         if (prev === "early-access") return prev;
         if (prev === "auth-action")  return prev;
@@ -106,24 +106,34 @@ function InnerApp() {
         if (role === "admin")   return "admin";
         return "dashboard";
       });
-    } else {
-      setPage(prev => PROTECTED_PAGES.has(prev) ? "landing" : prev);
+    } else if (!user) {
+      setPage(prev => {
+        // Never redirect away from auth-action — it needs to complete
+        if (prev === "auth-action") return prev;
+        return PROTECTED_PAGES.has(prev) ? "landing" : prev;
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loading, justSignedUp]);
+  }, [user, loading, user?.emailVerified]);
 
-  if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
-  if (user && role === "trainer") return <TrainerPortal navigate={navigate} />;
+  if (loading) {
+    // Even while loading, show AuthAction if URL has Firebase params
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") && params.get("oobCode")) {
+      return <AuthAction navigate={(p) => { setPage(p); }} />;
+    }
+    return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
+  }
+
+  if (user && user.emailVerified && role === "trainer") return <TrainerPortal navigate={navigate} />;
 
   const showNavbar = !["trainer-portal","auth-action"].includes(page);
   const showFooter = !["login","signup","trainer-portal","auth-action"].includes(page);
 
   function renderPage() {
-    // Logged in + verified + not just signed up → redirect public pages to dashboard
-    if (user && user.emailVerified && !justSignedUp && PUBLIC_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
+    if (user && user.emailVerified && PUBLIC_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
       return <Dashboard navigate={navigate} />;
     }
-    // Logged out on protected page → landing
     if (!user && PROTECTED_PAGES.has(page)) {
       return <Landing navigate={navigate} />;
     }
