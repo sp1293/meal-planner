@@ -11,12 +11,15 @@ const FROM   = "Mitabhukta <noreply@mitabhukta.com>";
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
   "https://mitabhukta.com",
+  "https://www.mitabhukta.com",
   "http://localhost:3000",
+  "https://meal-planner-ten-taupe.vercel.app",
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin && process.env.NODE_ENV !== "production") return callback(null, true);
+    // Allow requests with no origin always (Render health checks, mobile)
+    if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     callback(new Error("Not allowed by CORS"));
   },
