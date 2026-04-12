@@ -20,8 +20,8 @@ function AuthLayout({ children, title, subtitle, footer }) {
 }
 
 // ── Email Verification Screen ─────────────────────────────────────────────────
-function VerifyEmailScreen({ email, password, navigate }) {
-  const { resendVerificationEmail } = useAuth();
+function VerifyEmailScreen({ email, password, onBackToLogin }) {
+  const { resendVerificationEmail, clearJustSignedUp } = useAuth();
   const [resent,  setResent]  = useState(false);
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
@@ -36,6 +36,11 @@ function VerifyEmailScreen({ email, password, navigate }) {
       console.error("Resend verification error:", err.code, err.message);
       setError("Could not resend. Please try signing in again.");
     } finally { setLoading(false); }
+  }
+
+  function handleBack() {
+    clearJustSignedUp(); // ← clear flag so App.jsx redirects normally
+    onBackToLogin();
   }
 
   return (
@@ -58,7 +63,7 @@ function VerifyEmailScreen({ email, password, navigate }) {
         <button className="btn btn-primary btn-full" onClick={handleResend} disabled={loading} style={{ marginBottom: 10 }}>
           {loading ? <><span className="spin">⟳</span> Sending...</> : "📨 Resend Verification Email"}
         </button>
-        <button className="btn btn-ghost btn-full btn-sm" onClick={() => navigate("login")}>
+        <button className="btn btn-ghost btn-full btn-sm" onClick={handleBack}>
           ← Back to Sign In
         </button>
         <p style={{ fontSize: 12, color: "var(--text-4)", marginTop: 16, lineHeight: 1.6 }}>
@@ -84,7 +89,6 @@ function ForgotPasswordScreen({ onBack }) {
       await resetPassword(email);
       setSent(true);
     } catch (err) {
-      // Log actual error for debugging
       console.error("Password reset error:", err.code, err.message);
       setError(friendlyError(err.code));
     } finally { setLoading(false); }
@@ -118,17 +122,9 @@ function ForgotPasswordScreen({ onBack }) {
       <form onSubmit={handleReset}>
         <div className="form-group">
           <label htmlFor="reset-email">Email address</label>
-          <input
-            id="reset-email"
-            name="email"
-            className="form-control"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            autoFocus
-          />
+          <input id="reset-email" name="email" className="form-control" type="email"
+            placeholder="you@example.com" value={email}
+            onChange={e => setEmail(e.target.value)} required autoFocus />
         </div>
         <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ padding: 13, fontSize: 15 }}>
           {loading ? <><span className="spin">⟳</span> Sending...</> : "Send Reset Link"}
@@ -203,7 +199,7 @@ function GooglePreferences({ navigate }) {
 
 // ── Login Page ────────────────────────────────────────────────────────────────
 export function LoginPage({ navigate }) {
-  const { loginWithEmail, loginWithGoogle } = useAuth();
+  const { loginWithEmail, loginWithGoogle, clearJustSignedUp } = useAuth();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [showPw,   setShowPw]   = useState(false);
@@ -213,14 +209,21 @@ export function LoginPage({ navigate }) {
   const [screen,   setScreen]   = useState("login");
 
   if (screen === "forgot") return <ForgotPasswordScreen onBack={() => setScreen("login")} />;
-  if (screen === "verify") return <VerifyEmailScreen email={email} password={password} navigate={(p) => p === "login" ? setScreen("login") : navigate(p)} />;
-  if (screen === "prefs")  return <GooglePreferences navigate={navigate} />;
+  if (screen === "verify") return (
+    <VerifyEmailScreen
+      email={email}
+      password={password}
+      onBackToLogin={() => setScreen("login")}
+    />
+  );
+  if (screen === "prefs") return <GooglePreferences navigate={navigate} />;
 
   async function handleEmail(e) {
     e.preventDefault();
     setLoading(true); setError("");
     try {
       await loginWithEmail(email, password);
+      clearJustSignedUp(); // ensure flag is cleared on successful login
       navigate("dashboard");
     } catch (err) {
       console.error("Login error:", err.code, err.message);
@@ -236,6 +239,7 @@ export function LoginPage({ navigate }) {
     setGLoading(true); setError("");
     try {
       const { needsPrefs } = await loginWithGoogle();
+      clearJustSignedUp();
       if (needsPrefs) {
         setScreen("prefs");
       } else {
@@ -265,17 +269,9 @@ export function LoginPage({ navigate }) {
       <form onSubmit={handleEmail}>
         <div className="form-group">
           <label htmlFor="login-email">Email address</label>
-          <input
-            id="login-email"
-            name="email"
-            className="form-control"
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-          />
+          <input id="login-email" name="email" className="form-control" type="email"
+            placeholder="you@example.com" value={email}
+            onChange={e => setEmail(e.target.value)} required autoComplete="email" />
         </div>
         <div className="form-group">
           <label htmlFor="login-password" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -285,17 +281,10 @@ export function LoginPage({ navigate }) {
               {showPw ? "Hide" : "Show"}
             </button>
           </label>
-          <input
-            id="login-password"
-            name="password"
-            className="form-control"
-            type={showPw ? "text" : "password"}
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            required
-            autoComplete="current-password"
-          />
+          <input id="login-password" name="password" className="form-control"
+            type={showPw ? "text" : "password"} placeholder="••••••••"
+            value={password} onChange={e => setPassword(e.target.value)}
+            required autoComplete="current-password" />
           <div style={{ textAlign: "right", marginTop: 6 }}>
             <button type="button" onClick={() => setScreen("forgot")}
               style={{ background: "none", border: "none", color: "var(--primary)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" }}>
@@ -322,7 +311,7 @@ export function LoginPage({ navigate }) {
 
 // ── Signup Page ───────────────────────────────────────────────────────────────
 export function SignupPage({ navigate }) {
-  const { signupWithEmail, loginWithGoogle } = useAuth();
+  const { signupWithEmail, loginWithGoogle, clearJustSignedUp } = useAuth();
   const [name,       setName]       = useState("");
   const [email,      setEmail]      = useState("");
   const [password,   setPassword]   = useState("");
@@ -337,8 +326,17 @@ export function SignupPage({ navigate }) {
   const [savedEmail, setSavedEmail] = useState("");
   const [savedPass,  setSavedPass]  = useState("");
 
-  if (screen === "verify") return <VerifyEmailScreen email={savedEmail} password={savedPass} navigate={(p) => p === "login" ? navigate("login") : navigate(p)} />;
-  if (screen === "prefs")  return <GooglePreferences navigate={navigate} />;
+  if (screen === "verify") return (
+    <VerifyEmailScreen
+      email={savedEmail}
+      password={savedPass}
+      onBackToLogin={() => {
+        clearJustSignedUp(); // clear flag → App.jsx will redirect properly
+        navigate("login");
+      }}
+    />
+  );
+  if (screen === "prefs") return <GooglePreferences navigate={navigate} />;
 
   function getStrength(pw) {
     if (!pw) return { score: 0, label: "", color: "var(--border)" };
@@ -370,7 +368,7 @@ export function SignupPage({ navigate }) {
       trackSignup("email");
       setSavedEmail(email);
       setSavedPass(password);
-      setScreen("verify");
+      setScreen("verify"); // show verify screen — user is still logged in
     } catch (err) {
       console.error("Signup error:", err.code, err.message);
       setError(friendlyError(err.code));
@@ -499,7 +497,7 @@ export function SignupPage({ navigate }) {
   );
 }
 
-// ── Navbar dropdown (exported for Navbar.jsx if needed) ───────────────────────
+// ── Navbar dropdown ───────────────────────────────────────────────────────────
 export function NavbarDropdown({ profile, user, role, navigate, logout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -519,30 +517,30 @@ export function NavbarDropdown({ profile, user, role, navigate, logout }) {
 
   const items = role === "admin"
     ? [
-        { label: "Dashboard",          id: "dashboard" },
-        { label: "⚙️ Admin Panel",      id: "admin" },
-        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
-        { label: "🔥 Calorie Tracker",  id: "calories" },
-        { label: "🎯 Goal Tracker",     id: "goals" },
-        { label: "🚀 Early Access",     id: "early-access" },
-        { label: "Account",             id: "account" },
-        { label: "Guidelines",          id: "guidelines" },
+        { label: "Dashboard",         id: "dashboard" },
+        { label: "⚙️ Admin Panel",     id: "admin" },
+        { label: "🍳 Leftover Chef",   id: "leftover-chef" },
+        { label: "🔥 Calorie Tracker", id: "calories" },
+        { label: "🎯 Goal Tracker",    id: "goals" },
+        { label: "🚀 Early Access",    id: "early-access" },
+        { label: "Account",            id: "account" },
+        { label: "Guidelines",         id: "guidelines" },
       ]
     : [
-        { label: "Dashboard",           id: "dashboard" },
-        { label: "Meal Planner",        id: "planner" },
-        { label: "My Plans",            id: "my-plans" },
-        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
-        { label: "Trainers",            id: "trainers" },
-        { label: "My Bookings",         id: "my-bookings" },
-        { label: "🔥 Calorie Tracker",  id: "calories" },
-        { label: "🎯 Goal Tracker",     id: "goals" },
-        { label: "🎁 Refer & Earn",     id: "referral" },
-        { label: "🚀 Early Access",     id: "early-access" },
-        { label: "Account",             id: "account" },
-        { label: "Subscription",        id: "subscription" },
-        { label: "Guidelines",          id: "guidelines" },
-        { label: "🔒 Privacy Policy",   id: "privacy" },
+        { label: "Dashboard",          id: "dashboard" },
+        { label: "Meal Planner",       id: "planner" },
+        { label: "My Plans",           id: "my-plans" },
+        { label: "🍳 Leftover Chef",   id: "leftover-chef" },
+        { label: "Trainers",           id: "trainers" },
+        { label: "My Bookings",        id: "my-bookings" },
+        { label: "🔥 Calorie Tracker", id: "calories" },
+        { label: "🎯 Goal Tracker",    id: "goals" },
+        { label: "🎁 Refer & Earn",    id: "referral" },
+        { label: "🚀 Early Access",    id: "early-access" },
+        { label: "Account",            id: "account" },
+        { label: "Subscription",       id: "subscription" },
+        { label: "Guidelines",         id: "guidelines" },
+        { label: "🔒 Privacy Policy",  id: "privacy" },
       ];
 
   return (

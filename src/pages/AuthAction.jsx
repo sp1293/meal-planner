@@ -1,25 +1,21 @@
 import { useState, useEffect } from "react";
 import { applyActionCode, verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth";
 import { auth } from "../firebase";
-
-// ── This page handles Firebase email action links ──────────────────────────
-// URL format: mitabhukta.com?mode=verifyEmail&oobCode=XXX
-//             mitabhukta.com?mode=resetPassword&oobCode=XXX
+import { useAuth } from "../context/AuthContext";
 
 export default function AuthAction({ navigate }) {
-  const [mode,     setMode]     = useState("");
-  const [status,   setStatus]   = useState("loading"); // loading | success | error
-  const [error,    setError]    = useState("");
-
-  // Password reset fields
-  const [newPw,    setNewPw]    = useState("");
-  const [confirm,  setConfirm]  = useState("");
-  const [oobCode,  setOobCode]  = useState("");
-  const [saving,   setSaving]   = useState(false);
-  const [showPw,   setShowPw]   = useState(false);
+  const { clearJustSignedUp } = useAuth();
+  const [mode,    setMode]    = useState("");
+  const [status,  setStatus]  = useState("loading");
+  const [error,   setError]   = useState("");
+  const [newPw,   setNewPw]   = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [oobCode, setOobCode] = useState("");
+  const [saving,  setSaving]  = useState(false);
+  const [showPw,  setShowPw]  = useState(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
+    const params     = new URLSearchParams(window.location.search);
     const actionMode = params.get("mode");
     const code       = params.get("oobCode");
 
@@ -35,7 +31,6 @@ export default function AuthAction({ navigate }) {
     if (actionMode === "verifyEmail") {
       handleVerifyEmail(code);
     } else if (actionMode === "resetPassword") {
-      // Just validate the code — show password form
       verifyPasswordResetCode(auth, code)
         .then(() => setStatus("ready"))
         .catch(() => {
@@ -51,11 +46,12 @@ export default function AuthAction({ navigate }) {
   async function handleVerifyEmail(code) {
     try {
       await applyActionCode(auth, code);
+      clearJustSignedUp(); // ← KEY: clear flag so login works normally now
       setStatus("success");
     } catch (err) {
       console.error("Verify email error:", err.code);
       if (err.code === "auth/invalid-action-code") {
-        // Code already used — email might already be verified
+        clearJustSignedUp(); // clear even if already verified
         setStatus("already-verified");
       } else {
         setStatus("error");
@@ -78,7 +74,6 @@ export default function AuthAction({ navigate }) {
     } finally { setSaving(false); }
   }
 
-  // ── Shared layout ──────────────────────────────────────────────────────────
   function Layout({ children }) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, background: "var(--bg)" }}>
@@ -91,20 +86,16 @@ export default function AuthAction({ navigate }) {
     );
   }
 
-  // ── Loading ────────────────────────────────────────────────────────────────
   if (status === "loading") {
     return (
       <Layout>
         <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--primary-dark)", marginBottom: 8 }}>
-          Verifying...
-        </h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--primary-dark)", marginBottom: 8 }}>Verifying...</h1>
         <p style={{ fontSize: 14, color: "var(--text-3)" }}>Please wait a moment.</p>
       </Layout>
     );
   }
 
-  // ── Email verified successfully ────────────────────────────────────────────
   if (status === "success" && mode === "verifyEmail") {
     return (
       <Layout>
@@ -123,8 +114,7 @@ export default function AuthAction({ navigate }) {
             </div>
           ))}
         </div>
-        <button className="btn btn-primary btn-lg btn-full" onClick={() => navigate("login")}
-          style={{ marginBottom: 12 }}>
+        <button className="btn btn-primary btn-lg btn-full" onClick={() => navigate("login")} style={{ marginBottom: 12 }}>
           Sign In Now →
         </button>
         <button className="btn btn-ghost btn-full btn-sm" onClick={() => navigate("landing")}>
@@ -134,14 +124,11 @@ export default function AuthAction({ navigate }) {
     );
   }
 
-  // ── Already verified ───────────────────────────────────────────────────────
   if (status === "already-verified") {
     return (
       <Layout>
         <div style={{ fontSize: 64, marginBottom: 16 }}>✅</div>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 12 }}>
-          Already Verified!
-        </h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 12 }}>Already Verified!</h1>
         <p style={{ fontSize: 15, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 28 }}>
           Your email is already verified. Just sign in to access your account.
         </p>
@@ -152,16 +139,11 @@ export default function AuthAction({ navigate }) {
     );
   }
 
-  // ── Password reset form ────────────────────────────────────────────────────
   if (status === "ready" && mode === "resetPassword") {
     return (
       <Layout>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 8 }}>
-          Set New Password
-        </h1>
-        <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 28 }}>
-          Choose a strong password for your Mitabhukta account.
-        </p>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 8 }}>Set New Password</h1>
+        <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 28 }}>Choose a strong password for your Mitabhukta account.</p>
         <div className="card" style={{ padding: 28, textAlign: "left" }}>
           {error && <div className="banner banner-error mb-16">{error}</div>}
           <form onSubmit={handleResetPassword}>
@@ -173,37 +155,21 @@ export default function AuthAction({ navigate }) {
                   {showPw ? "Hide" : "Show"}
                 </button>
               </label>
-              <input
-                id="new-password"
-                name="new-password"
-                className="form-control"
-                type={showPw ? "text" : "password"}
-                placeholder="Min. 6 characters"
-                value={newPw}
-                onChange={e => setNewPw(e.target.value)}
-                required
-                autoFocus
-                autoComplete="new-password"
-              />
+              <input id="new-password" name="new-password" className="form-control"
+                type={showPw ? "text" : "password"} placeholder="Min. 6 characters"
+                value={newPw} onChange={e => setNewPw(e.target.value)}
+                required autoFocus autoComplete="new-password" />
             </div>
             <div className="form-group">
               <label htmlFor="confirm-password">Confirm New Password</label>
-              <input
-                id="confirm-password"
-                name="confirm-password"
-                className="form-control"
-                type={showPw ? "text" : "password"}
-                placeholder="Repeat new password"
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                required
-                autoComplete="new-password"
-              />
+              <input id="confirm-password" name="confirm-password" className="form-control"
+                type={showPw ? "text" : "password"} placeholder="Repeat new password"
+                value={confirm} onChange={e => setConfirm(e.target.value)}
+                required autoComplete="new-password" />
               {confirm && newPw !== confirm && <p className="form-error">Passwords do not match</p>}
               {confirm && newPw === confirm && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 5 }}>✓ Passwords match</p>}
             </div>
-            <button type="submit" className="btn btn-primary btn-full" disabled={saving || newPw.length < 6}
-              style={{ padding: 13, fontSize: 15 }}>
+            <button type="submit" className="btn btn-primary btn-full" disabled={saving || newPw.length < 6} style={{ padding: 13, fontSize: 15 }}>
               {saving ? <><span className="spin">⟳</span> Saving...</> : "Set New Password"}
             </button>
           </form>
@@ -212,14 +178,11 @@ export default function AuthAction({ navigate }) {
     );
   }
 
-  // ── Password reset success ─────────────────────────────────────────────────
   if (status === "password-reset-success") {
     return (
       <Layout>
         <div style={{ fontSize: 64, marginBottom: 16 }}>🔑</div>
-        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 12 }}>
-          Password Updated!
-        </h1>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: 28, color: "var(--primary-dark)", marginBottom: 12 }}>Password Updated!</h1>
         <p style={{ fontSize: 15, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 28 }}>
           Your password has been successfully reset. You can now sign in with your new password.
         </p>
@@ -230,23 +193,16 @@ export default function AuthAction({ navigate }) {
     );
   }
 
-  // ── Error state ────────────────────────────────────────────────────────────
   return (
     <Layout>
       <div style={{ fontSize: 64, marginBottom: 16 }}>❌</div>
-      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--primary-dark)", marginBottom: 12 }}>
-        Link Expired
-      </h1>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "var(--primary-dark)", marginBottom: 12 }}>Link Expired</h1>
       <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 24 }}>
         {error || "This link has expired or already been used."}
       </p>
       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-        <button className="btn btn-primary" onClick={() => navigate("login")}>
-          Sign In
-        </button>
-        <button className="btn btn-ghost" onClick={() => navigate("signup")}>
-          Sign Up
-        </button>
+        <button className="btn btn-primary" onClick={() => navigate("login")}>Sign In</button>
+        <button className="btn btn-ghost" onClick={() => navigate("signup")}>Sign Up</button>
       </div>
     </Layout>
   );
