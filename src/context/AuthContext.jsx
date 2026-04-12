@@ -8,7 +8,6 @@ import {
   updateProfile,
   sendEmailVerification,
   sendPasswordResetEmail,
-  generateEmailVerificationLink,
 } from "firebase/auth";
 import {
   doc, setDoc, getDoc, serverTimestamp,
@@ -17,13 +16,13 @@ import {
 import { auth, db, googleProvider } from "../firebase";
 
 const AuthContext = createContext(null);
-const API = process.env.REACT_APP_API_URL?.replace("/api/meal-plan", "") || "https://meal-planner-backend-0ul2.onrender.com";
+const API = process.env.REACT_APP_API_URL?.replace("/api/meal-plan", "")
+  || "https://meal-planner-backend-0ul2.onrender.com";
 
 function sanitize(str) {
   return String(str || "").replace(/[<>"'`]/g, "").trim().slice(0, 200);
 }
 
-// ── Send email via Resend (through backend) ────────────────────────────────
 async function sendEmail(endpoint, body) {
   try {
     const res = await fetch(`${API}/api/${endpoint}`, {
@@ -43,12 +42,17 @@ export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // When true, onAuthStateChanged does nothing at all
   const suppressAuthChange = useRef(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Completely ignore any Firebase auth events during signup/signout flows
       if (suppressAuthChange.current) return;
+
       setUser(firebaseUser);
+
       if (firebaseUser) {
         try {
           const userSnap = await getDoc(doc(db, "users", firebaseUser.uid));
@@ -62,7 +66,8 @@ export function AuthProvider({ children }) {
           } else {
             try {
               const trainerSnap = await getDocs(
-                query(collection(db, "trainers"), where("email", "==", firebaseUser.email?.toLowerCase()))
+                query(collection(db, "trainers"),
+                  where("email", "==", firebaseUser.email?.toLowerCase()))
               );
               if (!trainerSnap.empty) {
                 setProfile({ ...trainerSnap.docs[0].data(), role: "trainer" });
@@ -79,6 +84,7 @@ export function AuthProvider({ children }) {
       } else {
         setProfile(null);
       }
+
       setLoading(false);
     });
     return unsub;
@@ -132,7 +138,9 @@ export function AuthProvider({ children }) {
   async function loginWithEmail(email, password) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
+
       if (!cred.user.emailVerified) {
+        // Suppress then sign out — user must verify first
         suppressAuthChange.current = true;
         await signOut(auth);
         suppressAuthChange.current = false;
@@ -142,11 +150,15 @@ export function AuthProvider({ children }) {
         err.code = "auth/email-not-verified";
         throw err;
       }
+
+      // Verified — load profile and let onAuthStateChanged handle the rest
       const profileData = await createUserDoc(cred.user);
       setProfile(profileData);
       return { user: cred.user, role: "student" };
+
     } catch (firebaseErr) {
       if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
+      // Fallback — try trainer login
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -156,38 +168,46 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // ── Email signup — uses Resend for branded emails ──────────────────────────
+  // ── Email signup ───────────────────────────────────────────────────────────
+  // CRITICAL: suppress must stay true until AFTER setUser(null)/setProfile(null)
+  // Any gap between unsuppress and state clear causes the login flash
   async function signupWithEmail(email, password, name, extra = {}) {
+    // Suppress BEFORE everything — Firebase will fire auth events during creation
     suppressAuthChange.current = true;
+
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: sanitize(name) });
 
-      // Get Firebase verification link
-      let verificationLink = null;
+      // Send Firebase verification email (goes to spam but has real link)
       try {
-        // Firebase generates the link — we send it via Resend
-        await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
-        // For now use Firebase's built-in send, but styled via Resend fallback
-        // When Firebase Admin SDK is set up on backend, we can generate the link server-side
+        await sendEmailVerification(cred.user);
       } catch (e) {
         console.warn("Firebase verification email failed:", e.message);
       }
 
-      // Always also try Resend as primary (with Firebase link)
-      // Since we can't generate the Firebase link client-side, 
-      // we send a branded notification via Resend pointing to sign-in
+      // Send branded Resend verification email
+      // Note: We use Firebase's email for the actual verification link
+      // Resend email is a branded companion notification
       await sendEmail("send-verification", {
         email,
         name: sanitize(name),
-        verificationLink: verificationLink || "https://mitabhukta.com/login",
+        verificationLink: `https://mitabhukta.com`,
       });
 
+      // Save to Firestore
       await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
+
+      // Sign out while still suppressed
       await signOut(auth);
+
     } finally {
+      // Unsuppress ONLY after everything is done
       suppressAuthChange.current = false;
     }
+
+    // Clear state AFTER unsuppressing — this is intentional
+    // We manually clear rather than letting onAuthStateChanged do it
     setUser(null);
     setProfile(null);
   }
@@ -201,16 +221,19 @@ export function AuthProvider({ children }) {
       const needsPrefs = isNew || !snap.data()?.gender;
       const profileData = await createUserDoc(cred.user);
       setProfile(profileData);
-      // Send welcome email for new Google users
       if (isNew) {
+        // Fire and forget — don't await
         sendEmail("send-welcome", {
           email: cred.user.email,
-          name: cred.user.displayName,
+          name:  cred.user.displayName,
         });
       }
       return { user: cred.user, needsPrefs };
     } catch (err) {
-      if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
+      if (
+        err.code === "auth/popup-closed-by-user" ||
+        err.code === "auth/cancelled-popup-request"
+      ) {
         const e = new Error("Sign-in popup was closed. Please try again.");
         e.code = err.code;
         throw e;
@@ -234,26 +257,29 @@ export function AuthProvider({ children }) {
     } finally {
       suppressAuthChange.current = false;
     }
+    setUser(null);
+    setProfile(null);
   }
 
-  // ── Password reset — uses Resend for branded email ─────────────────────────
+  // ── Password reset ─────────────────────────────────────────────────────────
   async function resetPassword(email) {
-    // Firebase sends the reset email — also send branded version via Resend
     await sendPasswordResetEmail(auth, email);
-    // Resend branded notification (Firebase handles the actual reset link)
-    await sendEmail("send-password-reset", {
+    // Also send branded Resend email as companion
+    sendEmail("send-password-reset", {
       email,
-      name: "",
-      resetLink: "https://mitabhukta.com", // Firebase email has the real link
+      name:      "",
+      resetLink: "https://mitabhukta.com",
     });
   }
 
+  // ── Logout ─────────────────────────────────────────────────────────────────
   async function logout() {
     await signOut(auth);
     setUser(null);
     setProfile(null);
   }
 
+  // ── Update profile ─────────────────────────────────────────────────────────
   async function updateUserProfile(data) {
     if (!user) return;
     const sanitized = Object.fromEntries(
