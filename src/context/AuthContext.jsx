@@ -43,14 +43,12 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // When true, onAuthStateChanged does nothing at all
-  const suppressAuthChange = useRef(false);
+  // Track if we just signed up — so App.jsx knows to show verify screen
+  // instead of dashboard even though user is technically "logged in"
+  const [justSignedUp, setJustSignedUp] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Completely ignore any Firebase auth events during signup/signout flows
-      if (suppressAuthChange.current) return;
-
       setUser(firebaseUser);
 
       if (firebaseUser) {
@@ -83,6 +81,7 @@ export function AuthProvider({ children }) {
         }
       } else {
         setProfile(null);
+        setJustSignedUp(false);
       }
 
       setLoading(false);
@@ -140,25 +139,20 @@ export function AuthProvider({ children }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
       if (!cred.user.emailVerified) {
-        // Suppress then sign out — user must verify first
-        suppressAuthChange.current = true;
+        // Sign out cleanly — no suppression needed here since we WANT
+        // the user to stay on the verify screen
         await signOut(auth);
-        suppressAuthChange.current = false;
-        setUser(null);
-        setProfile(null);
         const err = new Error("Please verify your email before signing in.");
         err.code = "auth/email-not-verified";
         throw err;
       }
 
-      // Verified — load profile and let onAuthStateChanged handle the rest
       const profileData = await createUserDoc(cred.user);
       setProfile(profileData);
       return { user: cred.user, role: "student" };
 
     } catch (firebaseErr) {
       if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
-      // Fallback — try trainer login
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -169,47 +163,38 @@ export function AuthProvider({ children }) {
   }
 
   // ── Email signup ───────────────────────────────────────────────────────────
-  // CRITICAL: suppress must stay true until AFTER setUser(null)/setProfile(null)
-  // Any gap between unsuppress and state clear causes the login flash
+  // NEW APPROACH: Don't sign out. Instead set justSignedUp=true so
+  // Login.jsx shows the verify screen even though user is logged in.
+  // App.jsx checks emailVerified before redirecting to dashboard.
   async function signupWithEmail(email, password, name, extra = {}) {
-    // Suppress BEFORE everything — Firebase will fire auth events during creation
-    suppressAuthChange.current = true;
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(cred.user, { displayName: sanitize(name) });
 
+    // Mark as just signed up BEFORE any auth state changes
+    setJustSignedUp(true);
+
+    // Send Firebase verification email
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(cred.user, { displayName: sanitize(name) });
-
-      // Send Firebase verification email (goes to spam but has real link)
-      try {
-        await sendEmailVerification(cred.user);
-      } catch (e) {
-        console.warn("Firebase verification email failed:", e.message);
-      }
-
-      // Send branded Resend verification email
-      // Note: We use Firebase's email for the actual verification link
-      // Resend email is a branded companion notification
-      await sendEmail("send-verification", {
-        email,
-        name: sanitize(name),
-        verificationLink: `https://mitabhukta.com`,
-      });
-
-      // Save to Firestore
-      await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
-
-      // Sign out while still suppressed
-      await signOut(auth);
-
-    } finally {
-      // Unsuppress ONLY after everything is done
-      suppressAuthChange.current = false;
+      await sendEmailVerification(cred.user);
+    } catch (e) {
+      console.warn("Firebase verification email failed:", e.message);
     }
 
-    // Clear state AFTER unsuppressing — this is intentional
-    // We manually clear rather than letting onAuthStateChanged do it
-    setUser(null);
-    setProfile(null);
+    // Send branded Resend email
+    sendEmail("send-verification", {
+      email,
+      name: sanitize(name),
+      verificationLink: "https://mitabhukta.com",
+    });
+
+    // Save to Firestore
+    const profileData = await createUserDoc(cred.user, {
+      displayName: sanitize(name), ...extra,
+    });
+    setProfile(profileData);
+
+    // Return the user — Login.jsx will show verify screen
+    return cred.user;
   }
 
   // ── Google login ───────────────────────────────────────────────────────────
@@ -222,7 +207,6 @@ export function AuthProvider({ children }) {
       const profileData = await createUserDoc(cred.user);
       setProfile(profileData);
       if (isNew) {
-        // Fire and forget — don't await
         sendEmail("send-welcome", {
           email: cred.user.email,
           name:  cred.user.displayName,
@@ -249,22 +233,14 @@ export function AuthProvider({ children }) {
 
   // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
-    suppressAuthChange.current = true;
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(cred.user);
-      await signOut(auth);
-    } finally {
-      suppressAuthChange.current = false;
-    }
-    setUser(null);
-    setProfile(null);
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await sendEmailVerification(cred.user);
+    await signOut(auth);
   }
 
   // ── Password reset ─────────────────────────────────────────────────────────
   async function resetPassword(email) {
     await sendPasswordResetEmail(auth, email);
-    // Also send branded Resend email as companion
     sendEmail("send-password-reset", {
       email,
       name:      "",
@@ -289,14 +265,19 @@ export function AuthProvider({ children }) {
     setProfile(p => ({ ...p, ...sanitized }));
   }
 
+  function clearJustSignedUp() {
+    setJustSignedUp(false);
+  }
+
   const tier = profile?.tier || "free";
   const role = profile?.role || "student";
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, tier, role,
+      user, profile, loading, tier, role, justSignedUp,
       loginWithEmail, signupWithEmail, loginWithGoogle,
       logout, updateUserProfile, resetPassword, resendVerificationEmail,
+      clearJustSignedUp,
     }}>
       {children}
     </AuthContext.Provider>

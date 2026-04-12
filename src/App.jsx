@@ -27,7 +27,6 @@ import EarlyAccess    from "./pages/EarlyAccess";
 import AuthAction     from "./pages/AuthAction";
 import NotFound       from "./pages/NotFound";
 
-// ── PWA Install Banner ─────────────────────────────────────────────────────
 function PWAInstallBanner() {
   const [prompt, setPrompt] = useState(null);
   const [show,   setShow]   = useState(false);
@@ -63,7 +62,6 @@ function PWAInstallBanner() {
   );
 }
 
-// ── auth-action is always public — handles Firebase email links ────────────
 const PUBLIC_PAGES = new Set([
   "landing","login","signup","guidelines","privacy","terms",
   "early-access","auth-action",
@@ -75,7 +73,7 @@ const PROTECTED_PAGES = new Set([
 ]);
 
 function InnerApp() {
-  const { user, loading, role } = useAuth();
+  const { user, loading, role, justSignedUp } = useAuth();
   const [page, setPage] = useState("landing");
 
   function navigate(p) {
@@ -83,8 +81,7 @@ function InnerApp() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  // ── Detect Firebase email action links on first load ───────────────────────
-  // When user clicks verification/reset link, URL contains ?mode=...&oobCode=...
+  // Detect Firebase email action links on first load
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("mode") && params.get("oobCode")) {
@@ -92,12 +89,16 @@ function InnerApp() {
     }
   }, []);
 
-  // ── Auth-based redirects ───────────────────────────────────────────────────
+  // Auth-based redirects
   useEffect(() => {
     if (loading) return;
+
     if (user) {
+      // If user just signed up and email not verified — stay on signup/login page
+      // so the verify screen can show. Don't redirect to dashboard.
+      if (justSignedUp || !user.emailVerified) return;
+
       setPage(prev => {
-        // Never redirect away from these pages even when logged in
         if (prev === "early-access") return prev;
         if (prev === "auth-action")  return prev;
         if (!PUBLIC_PAGES.has(prev)) return prev;
@@ -109,17 +110,17 @@ function InnerApp() {
       setPage(prev => PROTECTED_PAGES.has(prev) ? "landing" : prev);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loading]);
+  }, [user, loading, justSignedUp]);
 
   if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
   if (user && role === "trainer") return <TrainerPortal navigate={navigate} />;
 
-  const showNavbar = !["trainer-portal", "auth-action"].includes(page);
+  const showNavbar = !["trainer-portal","auth-action"].includes(page);
   const showFooter = !["login","signup","trainer-portal","auth-action"].includes(page);
 
   function renderPage() {
-    // Logged in on public page → dashboard (except early-access and auth-action)
-    if (user && PUBLIC_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
+    // Logged in + verified + not just signed up → redirect public pages to dashboard
+    if (user && user.emailVerified && !justSignedUp && PUBLIC_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
       return <Dashboard navigate={navigate} />;
     }
     // Logged out on protected page → landing
@@ -128,36 +129,28 @@ function InnerApp() {
     }
 
     switch (page) {
-      // ── Public ───────────────────────────────────────────────────────────
-      case "landing":      return <Landing navigate={navigate} />;
-      case "login":        return <LoginPage navigate={navigate} />;
-      case "signup":       return <SignupPage navigate={navigate} />;
-      case "guidelines":   return <Guidelines navigate={navigate} />;
-      case "privacy":      return <PrivacyPolicy navigate={navigate} />;
-      case "terms":        return <TermsOfService navigate={navigate} />;
-      case "early-access": return <EarlyAccess navigate={navigate} />;
-      case "auth-action":  return <AuthAction navigate={navigate} />;
-
-      // ── Trainer ───────────────────────────────────────────────────────────
+      case "landing":        return <Landing navigate={navigate} />;
+      case "login":          return <LoginPage navigate={navigate} />;
+      case "signup":         return <SignupPage navigate={navigate} />;
+      case "guidelines":     return <Guidelines navigate={navigate} />;
+      case "privacy":        return <PrivacyPolicy navigate={navigate} />;
+      case "terms":          return <TermsOfService navigate={navigate} />;
+      case "early-access":   return <EarlyAccess navigate={navigate} />;
+      case "auth-action":    return <AuthAction navigate={navigate} />;
       case "trainer-portal": return <TrainerPortal navigate={navigate} />;
-
-      // ── Admin ─────────────────────────────────────────────────────────────
-      case "admin": return role !== "admin" ? <Dashboard navigate={navigate} /> : <AdminPanel navigate={navigate} />;
-
-      // ── Protected ─────────────────────────────────────────────────────────
-      case "dashboard":     return <Dashboard navigate={navigate} />;
-      case "planner":       return <MealPlanner navigate={navigate} />;
-      case "my-plans":      return <MyPlansPage navigate={navigate} />;
-      case "account":       return <AccountPage navigate={navigate} />;
-      case "subscription":  return <SubscriptionPage navigate={navigate} />;
-      case "trainers":      return <Trainers navigate={navigate} />;
-      case "my-bookings":   return <MyBookings navigate={navigate} />;
-      case "referral":      return <Referral navigate={navigate} />;
-      case "calories":      return <CalorieTracker navigate={navigate} />;
-      case "goals":         return <GoalTracker navigate={navigate} />;
-      case "leftover-chef": return <LeftoverChef navigate={navigate} />;
-
-      default: return <NotFound navigate={navigate} />;
+      case "admin":          return role !== "admin" ? <Dashboard navigate={navigate} /> : <AdminPanel navigate={navigate} />;
+      case "dashboard":      return <Dashboard navigate={navigate} />;
+      case "planner":        return <MealPlanner navigate={navigate} />;
+      case "my-plans":       return <MyPlansPage navigate={navigate} />;
+      case "account":        return <AccountPage navigate={navigate} />;
+      case "subscription":   return <SubscriptionPage navigate={navigate} />;
+      case "trainers":       return <Trainers navigate={navigate} />;
+      case "my-bookings":    return <MyBookings navigate={navigate} />;
+      case "referral":       return <Referral navigate={navigate} />;
+      case "calories":       return <CalorieTracker navigate={navigate} />;
+      case "goals":          return <GoalTracker navigate={navigate} />;
+      case "leftover-chef":  return <LeftoverChef navigate={navigate} />;
+      default:               return <NotFound navigate={navigate} />;
     }
   }
 
