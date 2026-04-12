@@ -87,16 +87,13 @@ export function AuthProvider({ children }) {
         emailVerified: firebaseUser.emailVerified || false,
       };
       await setDoc(ref, data);
-      setProfile(data);
       return data;
     } else {
       const existing = snap.data();
       if (existing.emailVerified !== firebaseUser.emailVerified) {
         await setDoc(ref, { emailVerified: firebaseUser.emailVerified }, { merge: true });
       }
-      const updated = { ...existing, emailVerified: firebaseUser.emailVerified };
-      setProfile(updated);
-      return updated;
+      return { ...existing, emailVerified: firebaseUser.emailVerified };
     }
   }
 
@@ -113,15 +110,28 @@ export function AuthProvider({ children }) {
     return trainer;
   }
 
-  // ── Email login — verification check DISABLED for testing ──────────────────
-  // TODO: Re-enable email verification before marketing launch
+  // ── Email login ────────────────────────────────────────────────────────────
   async function loginWithEmail(email, password) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      await createUserDoc(cred.user);
+
+      if (!cred.user.emailVerified) {
+        suppressAuthChange.current = true;
+        await signOut(auth);
+        suppressAuthChange.current = false;
+        setUser(null);
+        setProfile(null);
+        const err = new Error("Please verify your email before signing in.");
+        err.code = "auth/email-not-verified";
+        throw err;
+      }
+
+      const profileData = await createUserDoc(cred.user);
+      setProfile(profileData);
       return { user: cred.user, role: "student" };
+
     } catch (firebaseErr) {
-      // If Firebase auth fails, try trainer login as fallback
+      if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -132,18 +142,39 @@ export function AuthProvider({ children }) {
   }
 
   // ── Email signup ───────────────────────────────────────────────────────────
+  // KEY FIX: suppress auth change BEFORE creating account so user never
+  // sees a logged-in state during signup
   async function signupWithEmail(email, password, name, extra = {}) {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(cred.user, { displayName: sanitize(name) });
+    // Suppress BEFORE creating — prevents any flash of logged-in state
+    suppressAuthChange.current = true;
+
     try {
-      await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
-    } catch (e) {
-      console.warn("Verification email failed:", e.message);
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await updateProfile(cred.user, { displayName: sanitize(name) });
+
+      // Send verification email
+      try {
+        await sendEmailVerification(cred.user, {
+          url: "https://mitabhukta.com",
+        });
+      } catch (e) {
+        console.warn("Verification email failed:", e.message);
+      }
+
+      // Save to Firestore while still suppressed
+      await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
+
+      // Sign out immediately
+      await signOut(auth);
+
+    } finally {
+      // Always unsuppress, even if something fails
+      suppressAuthChange.current = false;
     }
-    await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
-    // NOTE: Not signing out — user goes straight to dashboard after signup
-    // Email verification is informational only while testing
-    return cred.user;
+
+    // Manually clear state AFTER unsuppressing
+    setUser(null);
+    setProfile(null);
   }
 
   // ── Google login ───────────────────────────────────────────────────────────
@@ -152,7 +183,8 @@ export function AuthProvider({ children }) {
       const cred = await signInWithPopup(auth, googleProvider);
       const snap = await getDoc(doc(db, "users", cred.user.uid));
       const needsPrefs = !snap.exists() || !snap.data()?.gender;
-      await createUserDoc(cred.user);
+      const profileData = await createUserDoc(cred.user);
+      setProfile(profileData);
       return { user: cred.user, needsPrefs };
     } catch (err) {
       if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
@@ -169,19 +201,23 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
     suppressAuthChange.current = true;
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(cred.user, { url: "https://mitabhukta.com" });
+      await sendEmailVerification(cred.user, {
+        url: "https://mitabhukta.com",
+      });
       await signOut(auth);
     } finally {
       suppressAuthChange.current = false;
     }
   }
 
+  // ── Password reset ─────────────────────────────────────────────────────────
   async function resetPassword(email) {
-    await sendPasswordResetEmail(auth, email, { url: "https://mitabhukta.com" });
+    await sendPasswordResetEmail(auth, email);
   }
 
   async function logout() {

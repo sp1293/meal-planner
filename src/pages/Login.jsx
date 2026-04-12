@@ -32,7 +32,8 @@ function VerifyEmailScreen({ email, password, navigate }) {
       await resendVerificationEmail(email, password);
       setResent(true);
       setTimeout(() => setResent(false), 6000);
-    } catch {
+    } catch (err) {
+      console.error("Resend verification error:", err.code, err.message);
       setError("Could not resend. Please try signing in again.");
     } finally { setLoading(false); }
   }
@@ -47,7 +48,8 @@ function VerifyEmailScreen({ email, password, navigate }) {
         </p>
         <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 14, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)", textAlign: "left" }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>📌 Can't find the email?</div>
-          <div style={{ marginBottom: 3 }}>• Check your spam/junk folder</div>
+          <div style={{ marginBottom: 3 }}>• Check your <strong>spam/junk</strong> folder</div>
+          <div style={{ marginBottom: 3 }}>• Search for "noreply@nourishai-27d26"</div>
           <div style={{ marginBottom: 3 }}>• Make sure you used the correct email</div>
           <div>• Wait up to 2 minutes for delivery</div>
         </div>
@@ -60,7 +62,7 @@ function VerifyEmailScreen({ email, password, navigate }) {
           ← Back to Sign In
         </button>
         <p style={{ fontSize: 12, color: "var(--text-4)", marginTop: 16, lineHeight: 1.6 }}>
-          After clicking the link in your email, come back here and sign in.
+          After clicking the link in your email, come back and sign in normally.
         </p>
       </div>
     </AuthLayout>
@@ -82,6 +84,8 @@ function ForgotPasswordScreen({ onBack }) {
       await resetPassword(email);
       setSent(true);
     } catch (err) {
+      // Log actual error for debugging
+      console.error("Password reset error:", err.code, err.message);
       setError(friendlyError(err.code));
     } finally { setLoading(false); }
   }
@@ -96,7 +100,8 @@ function ForgotPasswordScreen({ onBack }) {
             Click the link to set a new password.
           </p>
           <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)", textAlign: "left" }}>
-            <div style={{ marginBottom: 3 }}>• Check your spam folder if you don't see it</div>
+            <div style={{ marginBottom: 3 }}>• Check your <strong>spam folder</strong> if you don't see it</div>
+            <div style={{ marginBottom: 3 }}>• Search for "noreply@nourishai-27d26"</div>
             <div style={{ marginBottom: 3 }}>• Link expires in 1 hour</div>
             <div>• After resetting, come back and sign in</div>
           </div>
@@ -112,9 +117,18 @@ function ForgotPasswordScreen({ onBack }) {
       {error && <div className="banner banner-error mb-16">{error}</div>}
       <form onSubmit={handleReset}>
         <div className="form-group">
-          <label>Email address</label>
-          <input className="form-control" type="email" placeholder="you@example.com"
-            value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+          <label htmlFor="reset-email">Email address</label>
+          <input
+            id="reset-email"
+            name="email"
+            className="form-control"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            autoFocus
+          />
         </div>
         <button type="submit" className="btn btn-primary btn-full" disabled={loading} style={{ padding: 13, fontSize: 15 }}>
           {loading ? <><span className="spin">⟳</span> Sending...</> : "Send Reset Link"}
@@ -130,10 +144,9 @@ function GooglePreferences({ navigate }) {
   const [gender,  setGender]  = useState("");
   const [loading, setLoading] = useState(false);
   const [error,   setError]   = useState("");
-  const [done,    setDone]    = useState(false); // prevents re-render loop
+  const [done,    setDone]    = useState(false);
   const name = profile?.displayName?.split(" ")[0] || "there";
 
-  // If already saved, go to dashboard immediately
   useEffect(() => {
     if (done) navigate("dashboard");
   }, [done, navigate]);
@@ -144,7 +157,7 @@ function GooglePreferences({ navigate }) {
     setLoading(true);
     try {
       await updateUserProfile({ gender });
-      setDone(true); // use local flag instead of checking profile
+      setDone(true);
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -191,19 +204,17 @@ function GooglePreferences({ navigate }) {
 // ── Login Page ────────────────────────────────────────────────────────────────
 export function LoginPage({ navigate }) {
   const { loginWithEmail, loginWithGoogle } = useAuth();
-  const [email,      setEmail]      = useState("");
-  const [password,   setPassword]   = useState("");
-  const [showPw,     setShowPw]     = useState(false);
-  const [loading,    setLoading]    = useState(false);
-  const [gLoading,   setGLoading]   = useState(false);
-  const [error,      setError]      = useState("");
-  const [screen,     setScreen]     = useState("login"); // login | forgot | verify | prefs
+  const [email,    setEmail]    = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw,   setShowPw]   = useState(false);
+  const [loading,  setLoading]  = useState(false);
+  const [gLoading, setGLoading] = useState(false);
+  const [error,    setError]    = useState("");
+  const [screen,   setScreen]   = useState("login");
 
-  // Route to sub-screens
-  if (screen === "forgot")  return <ForgotPasswordScreen onBack={() => setScreen("login")} />;
-  if (screen === "verify")  return <VerifyEmailScreen email={email} password={password} navigate={(p) => p === "login" ? setScreen("login") : navigate(p)} />;
-  // Only show prefs if explicitly triggered by Google login — not on every render
-  if (screen === "prefs")   return <GooglePreferences navigate={navigate} />;
+  if (screen === "forgot") return <ForgotPasswordScreen onBack={() => setScreen("login")} />;
+  if (screen === "verify") return <VerifyEmailScreen email={email} password={password} navigate={(p) => p === "login" ? setScreen("login") : navigate(p)} />;
+  if (screen === "prefs")  return <GooglePreferences navigate={navigate} />;
 
   async function handleEmail(e) {
     e.preventDefault();
@@ -212,6 +223,7 @@ export function LoginPage({ navigate }) {
       await loginWithEmail(email, password);
       navigate("dashboard");
     } catch (err) {
+      console.error("Login error:", err.code, err.message);
       if (err.code === "auth/email-not-verified") {
         setScreen("verify");
       } else {
@@ -230,6 +242,7 @@ export function LoginPage({ navigate }) {
         navigate("dashboard");
       }
     } catch (err) {
+      console.error("Google login error:", err.code, err.message);
       setError(friendlyError(err.code));
     } finally { setGLoading(false); }
   }
@@ -239,7 +252,6 @@ export function LoginPage({ navigate }) {
       footer={<>Don't have an account? <button onClick={() => navigate("signup")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Sign up free</button></>}>
       {error && <div className="banner banner-error mb-16">{error}</div>}
 
-      {/* Google */}
       <button onClick={handleGoogle} disabled={gLoading}
         style={{ width: "100%", padding: "11px", border: "1.5px solid var(--border)", borderRadius: "var(--radius-sm)", background: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 20, transition: "var(--transition)", fontFamily: "var(--font-body)", color: "var(--text)" }}
         onMouseEnter={e => e.currentTarget.style.background = "var(--bg-muted)"}
@@ -252,21 +264,38 @@ export function LoginPage({ navigate }) {
 
       <form onSubmit={handleEmail}>
         <div className="form-group">
-          <label>Email address</label>
-          <input className="form-control" type="email" placeholder="you@example.com"
-            value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+          <label htmlFor="login-email">Email address</label>
+          <input
+            id="login-email"
+            name="email"
+            className="form-control"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+          />
         </div>
         <div className="form-group">
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <label htmlFor="login-password" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span>Password</span>
             <button type="button" onClick={() => setShowPw(p => !p)}
               style={{ background: "none", border: "none", color: "var(--primary)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" }}>
               {showPw ? "Hide" : "Show"}
             </button>
           </label>
-          <input className="form-control" type={showPw ? "text" : "password"} placeholder="••••••••"
-            value={password} onChange={e => setPassword(e.target.value)} required autoComplete="current-password" />
-          {/* Forgot password */}
+          <input
+            id="login-password"
+            name="password"
+            className="form-control"
+            type={showPw ? "text" : "password"}
+            placeholder="••••••••"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
           <div style={{ textAlign: "right", marginTop: 6 }}>
             <button type="button" onClick={() => setScreen("forgot")}
               style={{ background: "none", border: "none", color: "var(--primary)", fontSize: 12, cursor: "pointer", fontFamily: "var(--font-body)" }}>
@@ -304,12 +333,11 @@ export function SignupPage({ navigate }) {
   const [gLoading,   setGLoading]   = useState(false);
   const [error,      setError]      = useState("");
   const [step,       setStep]       = useState(1);
-  const [screen,     setScreen]     = useState("signup"); // signup | verify | prefs
+  const [screen,     setScreen]     = useState("signup");
   const [savedEmail, setSavedEmail] = useState("");
   const [savedPass,  setSavedPass]  = useState("");
 
   if (screen === "verify") return <VerifyEmailScreen email={savedEmail} password={savedPass} navigate={(p) => p === "login" ? navigate("login") : navigate(p)} />;
-  // Only show prefs if explicitly triggered — not on every render
   if (screen === "prefs")  return <GooglePreferences navigate={navigate} />;
 
   function getStrength(pw) {
@@ -344,6 +372,7 @@ export function SignupPage({ navigate }) {
       setSavedPass(password);
       setScreen("verify");
     } catch (err) {
+      console.error("Signup error:", err.code, err.message);
       setError(friendlyError(err.code));
       setStep(1);
     } finally { setLoading(false); }
@@ -356,6 +385,7 @@ export function SignupPage({ navigate }) {
       trackSignup("google");
       setScreen("prefs");
     } catch (err) {
+      console.error("Google signup error:", err.code, err.message);
       setError(friendlyError(err.code));
     } finally { setGLoading(false); }
   }
@@ -365,7 +395,6 @@ export function SignupPage({ navigate }) {
       footer={<>Already have an account? <button onClick={() => navigate("login")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}>Sign in</button></>}>
       {error && <div className="banner banner-error mb-16">{error}</div>}
 
-      {/* Step indicator */}
       <div style={{ display: "flex", gap: 8, marginBottom: 24, alignItems: "center" }}>
         {[1,2].map(s => (
           <div key={s} style={{ display: "flex", alignItems: "center", gap: 8, flex: 1 }}>
@@ -392,20 +421,20 @@ export function SignupPage({ navigate }) {
           <div className="divider-text">or sign up with email</div>
           <form onSubmit={handleStep1}>
             <div className="form-group">
-              <label>Full Name</label>
-              <input className="form-control" type="text" placeholder="Your full name" value={name} onChange={e => setName(e.target.value)} required />
+              <label htmlFor="signup-name">Full Name</label>
+              <input id="signup-name" name="name" className="form-control" type="text" placeholder="Your full name" value={name} onChange={e => setName(e.target.value)} required />
             </div>
             <div className="form-group">
-              <label>Email address</label>
-              <input className="form-control" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+              <label htmlFor="signup-email">Email address</label>
+              <input id="signup-email" name="email" className="form-control" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
             </div>
             <div className="form-group">
-              <label style={{ display: "flex", justifyContent: "space-between" }}>
+              <label htmlFor="signup-password" style={{ display: "flex", justifyContent: "space-between" }}>
                 <span>Password</span>
                 {password && <span style={{ fontSize: 12, fontWeight: 600, color: strength.color }}>{strength.label}</span>}
               </label>
               <div style={{ position: "relative" }}>
-                <input className="form-control" type={showPw ? "text" : "password"} placeholder="Min. 6 characters"
+                <input id="signup-password" name="password" className="form-control" type={showPw ? "text" : "password"} placeholder="Min. 6 characters"
                   value={password} onChange={e => setPassword(e.target.value)} required autoComplete="new-password" style={{ paddingRight: 48 }} />
                 <button type="button" onClick={() => setShowPw(p => !p)}
                   style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "var(--text-3)", cursor: "pointer", fontSize: 12 }}>
@@ -419,11 +448,11 @@ export function SignupPage({ navigate }) {
               )}
             </div>
             <div className="form-group">
-              <label>Confirm Password</label>
-              <input className="form-control" type={showPw ? "text" : "password"} placeholder="Repeat password"
+              <label htmlFor="signup-confirm">Confirm Password</label>
+              <input id="signup-confirm" name="confirm" className="form-control" type={showPw ? "text" : "password"} placeholder="Repeat password"
                 value={confirm} onChange={e => setConfirm(e.target.value)} required autoComplete="new-password" />
               {confirm && password !== confirm && <p className="form-error">Passwords do not match</p>}
-              {confirm && password === confirm && confirm && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 5 }}>✓ Passwords match</p>}
+              {confirm && password === confirm && <p style={{ fontSize: 12, color: "var(--primary)", marginTop: 5 }}>✓ Passwords match</p>}
             </div>
             <button type="submit" className="btn btn-primary btn-full" style={{ padding: 13, fontSize: 15 }}>Continue →</button>
           </form>
@@ -470,8 +499,8 @@ export function SignupPage({ navigate }) {
   );
 }
 
-// ── Navbar with dropdown close on outside click ───────────────────────────────
-export function NavbarDropdown({ profile, user, role, plan, navigate, logout }) {
+// ── Navbar dropdown (exported for Navbar.jsx if needed) ───────────────────────
+export function NavbarDropdown({ profile, user, role, navigate, logout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -487,6 +516,34 @@ export function NavbarDropdown({ profile, user, role, plan, navigate, logout }) 
 
   const initials = (profile?.displayName || profile?.name || user?.email || "U")
     .split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+
+  const items = role === "admin"
+    ? [
+        { label: "Dashboard",          id: "dashboard" },
+        { label: "⚙️ Admin Panel",      id: "admin" },
+        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
+        { label: "🔥 Calorie Tracker",  id: "calories" },
+        { label: "🎯 Goal Tracker",     id: "goals" },
+        { label: "🚀 Early Access",     id: "early-access" },
+        { label: "Account",             id: "account" },
+        { label: "Guidelines",          id: "guidelines" },
+      ]
+    : [
+        { label: "Dashboard",           id: "dashboard" },
+        { label: "Meal Planner",        id: "planner" },
+        { label: "My Plans",            id: "my-plans" },
+        { label: "🍳 Leftover Chef",    id: "leftover-chef" },
+        { label: "Trainers",            id: "trainers" },
+        { label: "My Bookings",         id: "my-bookings" },
+        { label: "🔥 Calorie Tracker",  id: "calories" },
+        { label: "🎯 Goal Tracker",     id: "goals" },
+        { label: "🎁 Refer & Earn",     id: "referral" },
+        { label: "🚀 Early Access",     id: "early-access" },
+        { label: "Account",             id: "account" },
+        { label: "Subscription",        id: "subscription" },
+        { label: "Guidelines",          id: "guidelines" },
+        { label: "🔒 Privacy Policy",   id: "privacy" },
+      ];
 
   return (
     <div style={{ position: "relative" }} ref={dropdownRef}>
@@ -504,35 +561,7 @@ export function NavbarDropdown({ profile, user, role, plan, navigate, logout }) 
             <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user?.email || profile?.email}</div>
             {role === "admin" && <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700, marginTop: 2 }}>Administrator</div>}
           </div>
-          {(role === "admin"
-            ? [
-                { label: "Dashboard",          id: "dashboard" },
-                { label: "⚙️ Admin Panel",      id: "admin" },
-                { label: "Trainers",           id: "trainers" },
-                { label: "Meal Planner",       id: "planner" },
-                { label: "🍳 Leftover Chef",   id: "leftover-chef" },
-                { label: "🔥 Calorie Tracker", id: "calories" },
-                { label: "🎯 Goal Tracker",    id: "goals" },
-                { label: "Account",            id: "account" },
-                { label: "Guidelines",         id: "guidelines" },
-                { label: "🔒 Privacy Policy",  id: "privacy" },
-              ]
-            : [
-                { label: "Dashboard",          id: "dashboard" },
-                { label: "Meal Planner",       id: "planner" },
-                { label: "My Plans",           id: "my-plans" },
-                { label: "🍳 Leftover Chef",   id: "leftover-chef" },
-                { label: "Trainers",           id: "trainers" },
-                { label: "My Bookings",        id: "my-bookings" },
-                { label: "🔥 Calorie Tracker", id: "calories" },
-                { label: "🎯 Goal Tracker",    id: "goals" },
-                { label: "🎁 Refer & Earn",    id: "referral" },
-                { label: "Account",            id: "account" },
-                { label: "Subscription",       id: "subscription" },
-                { label: "Guidelines",         id: "guidelines" },
-                { label: "🔒 Privacy Policy",  id: "privacy" },
-              ]
-          ).map(item => (
+          {items.map(item => (
             <button key={item.id}
               style={{ width: "100%", padding: "10px 14px", borderRadius: "var(--radius-xs)", fontSize: 14, color: "var(--text-2)", background: "none", border: "none", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-body)", display: "block" }}
               onClick={() => navigate(item.id)}
@@ -581,6 +610,7 @@ function friendlyError(code) {
     "auth/network-request-failed":  "Network error. Please check your connection.",
     "auth/invalid-credential":      "Invalid email or password. Please try again.",
     "auth/email-not-verified":      "Please verify your email before signing in.",
+    "auth/unauthorized-continue-uri": "Configuration error. Please try again.",
     "auth/account-exists-with-different-credential": "An account already exists with this email. Try signing in with email and password.",
   };
   return map[code] || "Something went wrong. Please try again.";

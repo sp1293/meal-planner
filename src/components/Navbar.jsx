@@ -10,7 +10,6 @@ export default function Navbar({ page, navigate }) {
   const dropdownRef = useRef(null);
   const plan = TIERS[tier] || TIERS.free;
 
-  // ── Close dropdown on outside click ───────────────────────────────────────
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -39,6 +38,7 @@ export default function Navbar({ page, navigate }) {
         { label: "🍳 Leftover Chef",   id: "leftover-chef" },
         { label: "🔥 Calorie Tracker", id: "calories" },
         { label: "🎯 Goal Tracker",    id: "goals" },
+        { label: "🚀 Early Access",    id: "early-access" },
         { label: "Account",            id: "account" },
         { label: "Guidelines",         id: "guidelines" },
         { label: "🔒 Privacy Policy",  id: "privacy" },
@@ -53,6 +53,7 @@ export default function Navbar({ page, navigate }) {
         { label: "🔥 Calorie Tracker", id: "calories" },
         { label: "🎯 Goal Tracker",    id: "goals" },
         { label: "🎁 Refer & Earn",    id: "referral" },
+        { label: "🚀 Early Access",    id: "early-access" },
         { label: "Account",            id: "account" },
         { label: "Subscription",       id: "subscription" },
         { label: "Guidelines",         id: "guidelines" },
@@ -85,12 +86,10 @@ export default function Navbar({ page, navigate }) {
 
   return (
     <nav style={s.nav}>
-      <div style={s.inner} className="navbar-inner">
-
+      <div style={s.inner}>
         {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
-          <img src="/logo192.png" alt="Mitabhukta"
-            style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }} />
+          <img src="/logo192.png" alt="Mitabhukta" style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }} />
           <span style={s.brandName}>Mitabhukta</span>
         </div>
 
@@ -114,6 +113,12 @@ export default function Navbar({ page, navigate }) {
               Guidelines
             </button>
           )}
+          {/* Early access visible to everyone */}
+          <button
+            onClick={() => navigate("early-access")}
+            style={{ ...s.link, ...(page === "early-access" ? s.linkActive : {}), color: "#059669", fontWeight: 600 }}>
+            🚀 Early Access
+          </button>
           {role === "admin" && (
             <button style={{ ...s.link, color: "#991b1b", background: page === "admin" ? "#fee2e2" : "none" }}
               onClick={() => navigate("admin")}>
@@ -129,25 +134,19 @@ export default function Navbar({ page, navigate }) {
               {role === "admin"
                 ? <span style={s.adminBadge}>Admin</span>
                 : <span style={s.tierBadge}>{plan.name}</span>}
-
-              {/* Avatar + dropdown — click outside closes it */}
               <div style={{ position: "relative" }} ref={dropdownRef}>
                 <div style={s.avatar} onClick={() => setMenuOpen(o => !o)}>
                   {profile?.photoURL
                     ? <img src={profile.photoURL} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
                     : initials}
                 </div>
-
                 {menuOpen && (
                   <div style={s.dropdown} onClick={() => setMenuOpen(false)}>
-                    {/* User info */}
                     <div style={{ padding: "10px 14px 12px", borderBottom: "1px solid var(--border)", marginBottom: 6 }}>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>{profile?.displayName || profile?.name || "User"}</div>
                       <div style={{ fontSize: 12, color: "var(--text-3)" }}>{user?.email || profile?.email}</div>
                       {role === "admin" && <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700, marginTop: 2 }}>Administrator</div>}
                     </div>
-
-                    {/* Menu items */}
                     {dropdownItems.map(item => (
                       <button key={item.id} style={s.dropItem}
                         onClick={() => navigate(item.id)}
@@ -156,8 +155,6 @@ export default function Navbar({ page, navigate }) {
                         {item.label}
                       </button>
                     ))}
-
-                    {/* Sign out */}
                     <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 6 }}>
                       <button style={{ ...s.dropItem, color: "var(--red-500)" }}
                         onClick={handleLogout}

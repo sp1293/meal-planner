@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import "./styles/global.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -23,8 +23,11 @@ import GoalTracker    from "./pages/GoalTracker";
 import LeftoverChef   from "./pages/LeftoverChef";
 import PrivacyPolicy  from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import EarlyAccess    from "./pages/EarlyAccess";
+import AuthAction     from "./pages/AuthAction";
 import NotFound       from "./pages/NotFound";
 
+// ── PWA Install Banner ─────────────────────────────────────────────────────
 function PWAInstallBanner() {
   const [prompt, setPrompt] = useState(null);
   const [show,   setShow]   = useState(false);
@@ -60,88 +63,101 @@ function PWAInstallBanner() {
   );
 }
 
-const PUBLIC_PAGES    = new Set(["landing","login","signup","guidelines","privacy","terms"]);
-const PROTECTED_PAGES = new Set(["dashboard","planner","my-plans","account","subscription","trainers","my-bookings","referral","admin","trainer-portal","calories","goals","leftover-chef"]);
+// ── auth-action is always public — handles Firebase email links ────────────
+const PUBLIC_PAGES = new Set([
+  "landing","login","signup","guidelines","privacy","terms",
+  "early-access","auth-action",
+]);
+const PROTECTED_PAGES = new Set([
+  "dashboard","planner","my-plans","account","subscription",
+  "trainers","my-bookings","referral","admin","trainer-portal",
+  "calories","goals","leftover-chef",
+]);
 
 function InnerApp() {
-  const { user, profile, loading, role } = useAuth();
+  const { user, loading, role } = useAuth();
   const [page, setPage] = useState("landing");
-  const renderCount = useRef(0);
-
-  // ── DEBUG: log every render ──────────────────────────────────────────────
-  renderCount.current += 1;
-  console.log(`[APP render #${renderCount.current}] page="${page}" user=${!!user} profile=${!!profile} loading=${loading} role="${role}"`);
 
   function navigate(p) {
-    console.log(`[NAVIGATE] "${page}" → "${p}"`);
     setPage(p);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
+  // ── Detect Firebase email action links on first load ───────────────────────
+  // When user clicks verification/reset link, URL contains ?mode=...&oobCode=...
   useEffect(() => {
-    console.log(`[EFFECT] fired. loading=${loading} user=${!!user} page="${page}"`);
-    if (loading) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") && params.get("oobCode")) {
+      setPage("auth-action");
+    }
+  }, []);
 
+  // ── Auth-based redirects ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (loading) return;
     if (user) {
       setPage(prev => {
-        if (!PUBLIC_PAGES.has(prev)) {
-          console.log(`[EFFECT] user logged in, page="${prev}" is protected — staying`);
-          return prev;
-        }
-        const next = role === "trainer" ? "trainer-portal" : role === "admin" ? "admin" : "dashboard";
-        console.log(`[EFFECT] user logged in, redirecting from "${prev}" → "${next}"`);
-        return next;
+        // Never redirect away from these pages even when logged in
+        if (prev === "early-access") return prev;
+        if (prev === "auth-action")  return prev;
+        if (!PUBLIC_PAGES.has(prev)) return prev;
+        if (role === "trainer") return "trainer-portal";
+        if (role === "admin")   return "admin";
+        return "dashboard";
       });
     } else {
-      setPage(prev => {
-        if (PROTECTED_PAGES.has(prev)) {
-          console.log(`[EFFECT] no user, redirecting from "${prev}" → "landing"`);
-          return "landing";
-        }
-        console.log(`[EFFECT] no user, page="${prev}" is public — staying`);
-        return prev;
-      });
+      setPage(prev => PROTECTED_PAGES.has(prev) ? "landing" : prev);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, loading]);
 
   if (loading) return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
-
   if (user && role === "trainer") return <TrainerPortal navigate={navigate} />;
 
-  const showNavbar = page !== "trainer-portal";
-  const showFooter = !["login","signup","trainer-portal"].includes(page);
+  const showNavbar = !["trainer-portal", "auth-action"].includes(page);
+  const showFooter = !["login","signup","trainer-portal","auth-action"].includes(page);
 
   function renderPage() {
-    if (user && PUBLIC_PAGES.has(page)) {
-      console.log(`[RENDER] user on public page "${page}" — showing Dashboard`);
+    // Logged in on public page → dashboard (except early-access and auth-action)
+    if (user && PUBLIC_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
       return <Dashboard navigate={navigate} />;
     }
+    // Logged out on protected page → landing
     if (!user && PROTECTED_PAGES.has(page)) {
-      console.log(`[RENDER] no user on protected page "${page}" — showing Landing`);
       return <Landing navigate={navigate} />;
     }
+
     switch (page) {
-      case "landing":        return <Landing navigate={navigate} />;
-      case "login":          return <LoginPage navigate={navigate} />;
-      case "signup":         return <SignupPage navigate={navigate} />;
-      case "guidelines":     return <Guidelines navigate={navigate} />;
-      case "privacy":        return <PrivacyPolicy navigate={navigate} />;
-      case "terms":          return <TermsOfService navigate={navigate} />;
+      // ── Public ───────────────────────────────────────────────────────────
+      case "landing":      return <Landing navigate={navigate} />;
+      case "login":        return <LoginPage navigate={navigate} />;
+      case "signup":       return <SignupPage navigate={navigate} />;
+      case "guidelines":   return <Guidelines navigate={navigate} />;
+      case "privacy":      return <PrivacyPolicy navigate={navigate} />;
+      case "terms":        return <TermsOfService navigate={navigate} />;
+      case "early-access": return <EarlyAccess navigate={navigate} />;
+      case "auth-action":  return <AuthAction navigate={navigate} />;
+
+      // ── Trainer ───────────────────────────────────────────────────────────
       case "trainer-portal": return <TrainerPortal navigate={navigate} />;
-      case "admin":          return role !== "admin" ? <Dashboard navigate={navigate} /> : <AdminPanel navigate={navigate} />;
-      case "dashboard":      return <Dashboard navigate={navigate} />;
-      case "planner":        return <MealPlanner navigate={navigate} />;
-      case "my-plans":       return <MyPlansPage navigate={navigate} />;
-      case "account":        return <AccountPage navigate={navigate} />;
-      case "subscription":   return <SubscriptionPage navigate={navigate} />;
-      case "trainers":       return <Trainers navigate={navigate} />;
-      case "my-bookings":    return <MyBookings navigate={navigate} />;
-      case "referral":       return <Referral navigate={navigate} />;
-      case "calories":       return <CalorieTracker navigate={navigate} />;
-      case "goals":          return <GoalTracker navigate={navigate} />;
-      case "leftover-chef":  return <LeftoverChef navigate={navigate} />;
-      default:               return <NotFound navigate={navigate} />;
+
+      // ── Admin ─────────────────────────────────────────────────────────────
+      case "admin": return role !== "admin" ? <Dashboard navigate={navigate} /> : <AdminPanel navigate={navigate} />;
+
+      // ── Protected ─────────────────────────────────────────────────────────
+      case "dashboard":     return <Dashboard navigate={navigate} />;
+      case "planner":       return <MealPlanner navigate={navigate} />;
+      case "my-plans":      return <MyPlansPage navigate={navigate} />;
+      case "account":       return <AccountPage navigate={navigate} />;
+      case "subscription":  return <SubscriptionPage navigate={navigate} />;
+      case "trainers":      return <Trainers navigate={navigate} />;
+      case "my-bookings":   return <MyBookings navigate={navigate} />;
+      case "referral":      return <Referral navigate={navigate} />;
+      case "calories":      return <CalorieTracker navigate={navigate} />;
+      case "goals":         return <GoalTracker navigate={navigate} />;
+      case "leftover-chef": return <LeftoverChef navigate={navigate} />;
+
+      default: return <NotFound navigate={navigate} />;
     }
   }
 
