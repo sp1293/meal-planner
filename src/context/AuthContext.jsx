@@ -7,7 +7,6 @@ import {
   signOut,
   updateProfile,
   sendEmailVerification,
-  sendPasswordResetEmail,
 } from "firebase/auth";
 import {
   doc, setDoc, getDoc, serverTimestamp,
@@ -133,12 +132,9 @@ export function AuthProvider({ children }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // ── CRITICAL FIX ──────────────────────────────────────────────────────
-      // Firebase caches the auth token. After user verifies email in another
-      // tab/window, the cached token still shows emailVerified=false.
-      // Call reload() to force Firebase to fetch fresh token from server.
+      // Force reload to get fresh emailVerified status from Firebase
       await cred.user.reload();
-      const freshUser = auth.currentUser; // get the reloaded user
+      const freshUser = auth.currentUser;
 
       if (!freshUser.emailVerified) {
         suppressAuthChange.current = true;
@@ -168,21 +164,22 @@ export function AuthProvider({ children }) {
   }
 
   // ── Email signup ───────────────────────────────────────────────────────────
+  // Uses backend to generate real Firebase link and send via Resend
   async function signupWithEmail(email, password, name, extra = {}) {
     suppressAuthChange.current = true;
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: sanitize(name) });
 
-      // Just use Firebase's own email — it has the real verification link
-try {
-  await sendEmailVerification(cred.user);
-} catch (e) {
-  console.warn("Firebase verification email failed:", e.message);
-}
-// Resend email disabled until we implement Firebase Admin SDK on backend
-
       await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
+
+      // Send branded verification email via Resend (backend generates real Firebase link)
+      // Fire and forget — don't block signup on email sending
+      sendEmail("send-verification-email", {
+        email,
+        name: sanitize(name),
+      });
+
       await signOut(auth);
     } finally {
       suppressAuthChange.current = false;
@@ -227,26 +224,25 @@ try {
 
   // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
+    // Sign in temporarily to validate credentials, then send via backend
     suppressAuthChange.current = true;
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
-      await sendEmailVerification(cred.user);
       await signOut(auth);
     } finally {
       suppressAuthChange.current = false;
     }
     setUser(null);
     setProfile(null);
+    // Send via backend (generates real Firebase link + Resend branded email)
+    await sendEmail("send-verification-email", { email, name: "" });
   }
 
-  // ── Password reset ─────────────────────────────────────────────────────────
+  // ── Password reset — fully via backend + Resend ───────────────────────────
   async function resetPassword(email) {
-    await sendPasswordResetEmail(auth, email);
-    sendEmail("send-password-reset", {
-      email,
-      name:      "",
-      resetLink: "https://mitabhukta.com",
-    });
+    // Backend generates real Firebase reset link and sends via Resend
+    const ok = await sendEmail("send-password-reset", { email, name: "" });
+    if (!ok) throw new Error("Failed to send reset email. Please try again.");
   }
 
   async function logout() {
@@ -264,7 +260,6 @@ try {
     setProfile(p => ({ ...p, ...sanitized }));
   }
 
-  // no-op kept for compatibility
   function clearJustSignedUp() {}
 
   const tier = profile?.tier || "free";

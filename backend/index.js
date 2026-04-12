@@ -1,12 +1,28 @@
 require("dotenv").config();
-const express   = require("express");
-const cors      = require("cors");
-const fetch     = require("node-fetch");
+const express    = require("express");
+const cors       = require("cors");
+const fetch      = require("node-fetch");
 const { Resend } = require("resend");
+const admin      = require("firebase-admin");
 
 const app    = express();
 const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM   = "Mitabhukta <noreply@mitabhukta.com>";
+
+// ── Firebase Admin SDK ─────────────────────────────────────────────────────
+// Service account JSON is stored as an env variable in Render
+// Never commit this to GitHub
+if (!admin.apps.length) {
+  try {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("Firebase Admin SDK initialized");
+  } catch (err) {
+    console.error("Firebase Admin SDK init failed:", err.message);
+  }
+}
 
 // ── CORS ───────────────────────────────────────────────────────────────────
 const ALLOWED_ORIGINS = [
@@ -18,7 +34,6 @@ const ALLOWED_ORIGINS = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin always (Render health checks, mobile)
     if (!origin) return callback(null, true);
     if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
     callback(new Error("Not allowed by CORS"));
@@ -65,6 +80,70 @@ setInterval(() => {
 function sanitizeString(str, maxLen = 500) {
   if (typeof str !== "string") return "";
   return str.replace(/[<>"'`]/g, "").trim().slice(0, maxLen);
+}
+
+// ── Email HTML builder ─────────────────────────────────────────────────────
+function verificationEmailHtml(name, verificationLink) {
+  return `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 0;">
+<tr><td align="center">
+<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+  <tr>
+    <td style="background:linear-gradient(135deg,#052e16 0%,#14532d 50%,#166534 100%);padding:40px;text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">🥗</div>
+      <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;color:#fff;">Mitabhukta</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px;">Your Wellness, Reimagined.</div>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding:40px;">
+      <h1 style="font-family:Georgia,serif;font-size:22px;color:#052e16;margin:0 0 12px;">
+        Hey ${name}, verify your email 👋
+      </h1>
+      <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">
+        Thanks for signing up! Click the button below to verify your email and activate your Mitabhukta account.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td align="center" style="padding:0 0 32px;">
+            <a href="${verificationLink}" style="display:inline-block;background:#166534;color:#fff;font-size:16px;font-weight:700;padding:16px 40px;border-radius:8px;text-decoration:none;">
+              ✅ Verify My Email
+            </a>
+          </td>
+        </tr>
+      </table>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="font-size:13px;font-weight:700;color:#052e16;margin-bottom:12px;">🎉 Your free account includes:</div>
+        <div style="font-size:13px;color:#374151;line-height:1.8;">
+          ✓ 2 AI meal plans per month<br/>
+          ✓ Certified trainer booking<br/>
+          ✓ Calorie tracker with photo AI<br/>
+          ✓ Leftover Chef recipes<br/>
+          ✓ Indian grocery shopping lists
+        </div>
+      </div>
+      <div style="background:#f9fafb;border-radius:8px;padding:14px;margin-bottom:20px;">
+        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;">Button not working? Copy this link:</p>
+        <a href="${verificationLink}" style="font-size:11px;color:#166534;word-break:break-all;">${verificationLink}</a>
+      </div>
+      <p style="font-size:12px;color:#9ca3af;margin:0;">If you didn't create this account, you can safely ignore this email.</p>
+    </td>
+  </tr>
+  <tr>
+    <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+      <p style="font-size:12px;color:#9ca3af;margin:0;">
+        © ${new Date().getFullYear()} Mitabhukta · Bengaluru, India ·
+        <a href="https://mitabhukta.com" style="color:#6b7280;text-decoration:none;">mitabhukta.com</a>
+      </p>
+    </td>
+  </tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
 }
 
 // ── Health check ───────────────────────────────────────────────────────────
@@ -139,111 +218,58 @@ app.get("/api/places",
   }
 );
 
-// ── EMAIL ROUTES ───────────────────────────────────────────────────────────
-
-// POST /api/send-verification
-app.post("/api/send-verification",
+// ── KEY NEW ROUTE: Generate Firebase verification link + send via Resend ───
+// Frontend calls this instead of sendEmailVerification()
+// Admin SDK generates the real Firebase link → Resend sends branded email
+app.post("/api/send-verification-email",
   rateLimit(5, 60 * 1000),
   async (req, res) => {
     try {
-      const { email, name, verificationLink } = req.body;
-      if (!email || !verificationLink) {
-        return res.status(400).json({ error: "email and verificationLink are required" });
-      }
+      const { email, name } = req.body;
+      if (!email) return res.status(400).json({ error: "email is required" });
 
+      // Generate real Firebase email verification link
+      const verificationLink = await admin.auth().generateEmailVerificationLink(
+        email,
+        { url: "https://mitabhukta.com" }
+      );
+
+      // Send via Resend — from noreply@mitabhukta.com
       await resend.emails.send({
         from: FROM,
         to: email,
         subject: "Verify your Mitabhukta account ✅",
-        html: `
-<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 0;">
-<tr><td align="center">
-<table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
-  <tr>
-    <td style="background:linear-gradient(135deg,#052e16 0%,#14532d 50%,#166534 100%);padding:40px;text-align:center;">
-      <div style="font-size:36px;margin-bottom:8px;">🥗</div>
-      <div style="font-family:Georgia,serif;font-size:26px;font-weight:700;color:#fff;">Mitabhukta</div>
-      <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px;">Your Wellness, Reimagined.</div>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding:40px;">
-      <h1 style="font-family:Georgia,serif;font-size:22px;color:#052e16;margin:0 0 12px;">
-        Hey ${sanitizeString(name) || "there"}, verify your email 👋
-      </h1>
-      <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">
-        Thanks for signing up! Click the button below to verify your email and activate your Mitabhukta account.
-      </p>
-      <table width="100%" cellpadding="0" cellspacing="0">
-        <tr>
-          <td align="center" style="padding:0 0 32px;">
-            <a href="${verificationLink}" style="display:inline-block;background:#166534;color:#fff;font-size:16px;font-weight:700;padding:16px 40px;border-radius:8px;text-decoration:none;">
-              ✅ Verify My Email
-            </a>
-          </td>
-        </tr>
-      </table>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:20px;margin-bottom:24px;">
-        <div style="font-size:13px;font-weight:700;color:#052e16;margin-bottom:12px;">🎉 Your free account includes:</div>
-        <div style="font-size:13px;color:#374151;line-height:1.8;">
-          ✓ 2 AI meal plans per month<br/>
-          ✓ Certified trainer booking<br/>
-          ✓ Calorie tracker with photo AI<br/>
-          ✓ Leftover Chef recipes<br/>
-          ✓ Indian grocery shopping lists
-        </div>
-      </div>
-      <div style="background:#f9fafb;border-radius:8px;padding:14px;margin-bottom:20px;">
-        <p style="font-size:12px;color:#6b7280;margin:0 0 6px;">Button not working? Copy this link:</p>
-        <a href="${verificationLink}" style="font-size:11px;color:#166534;word-break:break-all;">${verificationLink}</a>
-      </div>
-      <p style="font-size:12px;color:#9ca3af;margin:0;">
-        If you didn't create this account, you can safely ignore this email.
-      </p>
-    </td>
-  </tr>
-  <tr>
-    <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-      <p style="font-size:12px;color:#9ca3af;margin:0;">
-        © ${new Date().getFullYear()} Mitabhukta · Bengaluru, India ·
-        <a href="https://mitabhukta.com" style="color:#6b7280;text-decoration:none;">mitabhukta.com</a>
-      </p>
-    </td>
-  </tr>
-</table>
-</td></tr>
-</table>
-</body>
-</html>`,
+        html: verificationEmailHtml(sanitizeString(name) || "there", verificationLink),
       });
 
+      console.log(`Verification email sent to ${email}`);
       res.json({ success: true });
     } catch (err) {
-      console.error("Send verification error:", err);
+      console.error("Send verification email error:", err.message);
       res.status(500).json({ error: "Failed to send verification email" });
     }
   }
 );
 
-// POST /api/send-password-reset
+// ── Password reset email via Resend ───────────────────────────────────────
 app.post("/api/send-password-reset",
   rateLimit(5, 60 * 1000),
   async (req, res) => {
     try {
-      const { email, name, resetLink } = req.body;
-      if (!email || !resetLink) {
-        return res.status(400).json({ error: "email and resetLink are required" });
-      }
+      const { email, name } = req.body;
+      if (!email) return res.status(400).json({ error: "email is required" });
+
+      // Generate real Firebase password reset link
+      const resetLink = await admin.auth().generatePasswordResetLink(
+        email,
+        { url: "https://mitabhukta.com" }
+      );
 
       await resend.emails.send({
         from: FROM,
         to: email,
         subject: "Reset your Mitabhukta password 🔑",
-        html: `
-<!DOCTYPE html>
+        html: `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 0;">
@@ -258,11 +284,9 @@ app.post("/api/send-password-reset",
   </tr>
   <tr>
     <td style="padding:40px;">
-      <h1 style="font-family:Georgia,serif;font-size:22px;color:#052e16;margin:0 0 12px;">
-        Reset your password
-      </h1>
+      <h1 style="font-family:Georgia,serif;font-size:22px;color:#052e16;margin:0 0 12px;">Reset your password</h1>
       <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">
-        Hi ${sanitizeString(name) || "there"}, we received a request to reset your Mitabhukta password. Click the button below.
+        Hi ${sanitizeString(name) || "there"}, click below to reset your Mitabhukta password.
       </p>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
@@ -274,11 +298,9 @@ app.post("/api/send-password-reset",
         </tr>
       </table>
       <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:14px;margin-bottom:24px;">
-        <p style="font-size:13px;color:#92400e;margin:0;">
-          ⚠️ This link expires in <strong>1 hour</strong>. If you didn't request this, ignore this email — your password won't change.
-        </p>
+        <p style="font-size:13px;color:#92400e;margin:0;">⚠️ This link expires in <strong>1 hour</strong>. If you didn't request this, ignore this email.</p>
       </div>
-      <div style="background:#f9fafb;border-radius:8px;padding:14px;margin-bottom:20px;">
+      <div style="background:#f9fafb;border-radius:8px;padding:14px;">
         <p style="font-size:12px;color:#6b7280;margin:0 0 6px;">Button not working? Copy this link:</p>
         <a href="${resetLink}" style="font-size:11px;color:#166534;word-break:break-all;">${resetLink}</a>
       </div>
@@ -286,10 +308,7 @@ app.post("/api/send-password-reset",
   </tr>
   <tr>
     <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-      <p style="font-size:12px;color:#9ca3af;margin:0;">
-        © ${new Date().getFullYear()} Mitabhukta · Bengaluru, India ·
-        <a href="https://mitabhukta.com" style="color:#6b7280;text-decoration:none;">mitabhukta.com</a>
-      </p>
+      <p style="font-size:12px;color:#9ca3af;margin:0;">© ${new Date().getFullYear()} Mitabhukta · Bengaluru, India</p>
     </td>
   </tr>
 </table>
@@ -301,13 +320,13 @@ app.post("/api/send-password-reset",
 
       res.json({ success: true });
     } catch (err) {
-      console.error("Send password reset error:", err);
+      console.error("Send password reset error:", err.message);
       res.status(500).json({ error: "Failed to send password reset email" });
     }
   }
 );
 
-// POST /api/send-welcome
+// ── Welcome email ──────────────────────────────────────────────────────────
 app.post("/api/send-welcome",
   rateLimit(5, 60 * 1000),
   async (req, res) => {
@@ -319,8 +338,7 @@ app.post("/api/send-welcome",
         from: FROM,
         to: email,
         subject: `Welcome to Mitabhukta, ${sanitizeString(name) || "there"}! 🎉`,
-        html: `
-<!DOCTYPE html>
+        html: `<!DOCTYPE html>
 <html>
 <body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 0;">
@@ -335,30 +353,24 @@ app.post("/api/send-welcome",
   </tr>
   <tr>
     <td style="padding:40px;">
-      <h2 style="font-family:Georgia,serif;font-size:20px;color:#052e16;margin:0 0 14px;">
-        Hi ${sanitizeString(name) || "there"}, you're all set! 👋
-      </h2>
-      <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">
-        Your email is verified and your account is active. Here's how to get started:
-      </p>
+      <h2 style="font-family:Georgia,serif;font-size:20px;color:#052e16;margin:0 0 14px;">Hi ${sanitizeString(name) || "there"}, you're all set! 👋</h2>
+      <p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">Your email is verified and your account is active.</p>
       <div style="border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:14px;">
         <div style="font-weight:700;font-size:15px;color:#111827;margin-bottom:4px;">🍛 Generate your first meal plan</div>
-        <div style="font-size:13px;color:#6b7280;">AI creates a personalized 7-day Indian meal plan for you in seconds.</div>
+        <div style="font-size:13px;color:#6b7280;">AI creates a personalized 7-day Indian meal plan in seconds.</div>
       </div>
       <div style="border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:14px;">
         <div style="font-weight:700;font-size:15px;color:#111827;margin-bottom:4px;">🔥 Track calories with a photo</div>
-        <div style="font-size:13px;color:#6b7280;">Snap a photo of your thali — AI identifies and counts calories instantly.</div>
+        <div style="font-size:13px;color:#6b7280;">Snap a photo of your thali — AI counts calories instantly.</div>
       </div>
       <div style="border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin-bottom:28px;">
         <div style="font-weight:700;font-size:15px;color:#111827;margin-bottom:4px;">💪 Book a certified trainer</div>
-        <div style="font-size:13px;color:#6b7280;">Browse yoga and fitness trainers and book a session directly.</div>
+        <div style="font-size:13px;color:#6b7280;">Browse yoga and fitness trainers and book directly.</div>
       </div>
       <table width="100%" cellpadding="0" cellspacing="0">
         <tr>
           <td align="center">
-            <a href="https://mitabhukta.com" style="display:inline-block;background:#166534;color:#fff;font-size:16px;font-weight:700;padding:16px 48px;border-radius:8px;text-decoration:none;">
-              Go to Dashboard →
-            </a>
+            <a href="https://mitabhukta.com" style="display:inline-block;background:#166534;color:#fff;font-size:16px;font-weight:700;padding:16px 48px;border-radius:8px;text-decoration:none;">Go to Dashboard →</a>
           </td>
         </tr>
       </table>
@@ -366,12 +378,8 @@ app.post("/api/send-welcome",
   </tr>
   <tr>
     <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-      <p style="font-size:12px;color:#9ca3af;margin:0 0 6px;">
-        Questions? Email us at <a href="mailto:support@mitabhukta.com" style="color:#166534;">support@mitabhukta.com</a>
-      </p>
-      <p style="font-size:12px;color:#9ca3af;margin:0;">
-        © ${new Date().getFullYear()} Mitabhukta · Bengaluru, India
-      </p>
+      <p style="font-size:12px;color:#9ca3af;margin:0 0 6px;">Questions? <a href="mailto:support@mitabhukta.com" style="color:#166534;">support@mitabhukta.com</a></p>
+      <p style="font-size:12px;color:#9ca3af;margin:0;">© ${new Date().getFullYear()} Mitabhukta · Bengaluru, India</p>
     </td>
   </tr>
 </table>
@@ -383,7 +391,7 @@ app.post("/api/send-welcome",
 
       res.json({ success: true });
     } catch (err) {
-      console.error("Send welcome error:", err);
+      console.error("Send welcome error:", err.message);
       res.status(500).json({ error: "Failed to send welcome email" });
     }
   }
