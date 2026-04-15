@@ -20,9 +20,7 @@ export default class ErrorBoundary extends Component {
         <div style={{ minHeight:"100vh", display:"flex", alignItems:"center", justifyContent:"center", padding:24, background:"var(--bg)", fontFamily:"var(--font-body)" }}>
           <div style={{ maxWidth:480, textAlign:"center" }}>
             <div style={{ fontSize:56, marginBottom:16 }}>😕</div>
-            <h1 style={{ fontFamily:"var(--font-display)", fontSize:26, color:"var(--primary-dark)", marginBottom:10 }}>
-              Something went wrong
-            </h1>
+            <h1 style={{ fontFamily:"var(--font-display)", fontSize:26, color:"var(--primary-dark)", marginBottom:10 }}>Something went wrong</h1>
             <p style={{ fontSize:15, color:"var(--text-3)", marginBottom:24, lineHeight:1.7 }}>
               An unexpected error occurred. Please try refreshing the page.
             </p>
