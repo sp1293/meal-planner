@@ -1,17 +1,20 @@
+import { useState, useEffect } from "react";
+import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useSub } from "../context/SubContext";
 import { TIERS } from "../config";
-import { TRAINERS_DATA } from "./Trainers";
 
 export default function Dashboard({ navigate }) {
   const { profile } = useAuth();
   const { plan } = useSub();
+  const [featuredTrainers, setFeaturedTrainers] = useState([]);
 
-  const name = profile?.displayName?.split(" ")[0] || "there";
-  const plansUsed = profile?.plansUsed || 0;
-  const plansLeft = plan.plansPerMonth >= 999 ? "∞" : Math.max(0, plan.plansPerMonth - plansUsed);
+  const name        = profile?.displayName?.split(" ")[0] || "there";
+  const plansUsed   = profile?.plansUsed || 0;
+  const plansLeft   = plan.plansPerMonth >= 999 ? "∞" : Math.max(0, plan.plansPerMonth - plansUsed);
   const usagePercent = plan.plansPerMonth >= 999 ? 0 : Math.min(100, (plansUsed / plan.plansPerMonth) * 100);
-  const tierInfo = TIERS[plan.id];
+  const tierInfo    = TIERS[plan.id];
 
   // Load bookings from localStorage
   const STORAGE_KEY = `mitabhukta_bookings_${profile?.uid || "guest"}`;
@@ -21,11 +24,31 @@ export default function Dashboard({ navigate }) {
     upcomingBookings = saved ? JSON.parse(saved).slice(0, 3) : [];
   } catch {}
 
+  // Load featured trainers from Firestore
+  useEffect(() => {
+    async function loadFeaturedTrainers() {
+      try {
+        const snap = await getDocs(
+          query(collection(db, "trainers"), where("status", "!=", "suspended"), limit(4))
+        );
+        setFeaturedTrainers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch {
+        setFeaturedTrainers([]);
+      }
+    }
+    loadFeaturedTrainers();
+  }, []);
+
+  function getTypeIcon(type) {
+    const icons = { "Yoga Instructor": "🧘", "Gym Trainer": "🏋️", "Nutritionist": "🥗", "Physiotherapist": "🩺" };
+    return icons[type] || "💪";
+  }
+
   const quickActions = [
     { icon: "🍛", label: "Generate Meal Plan",  desc: "Create a new AI-powered plan",       id: "planner",      color: "#f0fdf4", border: "#bbf7d0" },
     { icon: "📋", label: "My Saved Plans",       desc: "View your meal plan history",         id: "my-plans",     color: "#eff6ff", border: "#bfdbfe" },
     { icon: "💳", label: "Manage Subscription",  desc: "Upgrade or change your plan",         id: "subscription", color: "#fdf4ff", border: "#e9d5ff" },
-    { icon: "👤", label: "Account Settings",      desc: "Update your profile and preferences", id: "account",      color: "#fffbeb", border: "#fde68a" },
+    { icon: "👤", label: "Account Settings",     desc: "Update your profile and preferences", id: "account",      color: "#fffbeb", border: "#fde68a" },
   ];
 
   return (
@@ -74,7 +97,10 @@ export default function Dashboard({ navigate }) {
           </div>
           {usagePercent > 80 && (
             <div style={{ marginTop: 10, fontSize: 13, color: "var(--red-500)", fontWeight: 500 }}>
-              ⚠️ Running low! <button onClick={() => navigate("subscription")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>Upgrade for unlimited plans →</button>
+              ⚠️ Running low!{" "}
+              <button onClick={() => navigate("subscription")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 700 }}>
+                Upgrade for unlimited plans →
+              </button>
             </div>
           )}
         </div>
@@ -88,7 +114,8 @@ export default function Dashboard({ navigate }) {
           </h2>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }} className="anim-fade-up-2">
             {upcomingBookings.map(b => (
-              <div key={b.id} style={{ background: "#fff", border: "1.5px solid var(--primary-soft)", borderRadius: "var(--radius-md)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, cursor: "pointer" }}
+              <div key={b.id}
+                style={{ background: "#fff", border: "1.5px solid var(--primary-soft)", borderRadius: "var(--radius-md)", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, cursor: "pointer" }}
                 onClick={() => navigate("my-bookings")}
                 onMouseEnter={e => e.currentTarget.style.boxShadow = "var(--shadow-md)"}
                 onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}>
@@ -98,9 +125,7 @@ export default function Dashboard({ navigate }) {
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{b.trainerName}</div>
-                    <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 2 }}>
-                      📅 {b.dateLabel} · ⏰ {b.time}
-                    </div>
+                    <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 2 }}>📅 {b.dateLabel} · ⏰ {b.time}</div>
                     <div style={{ fontSize: 12, color: "var(--text-4)" }}>{b.sessionType} · {b.speciality}</div>
                   </div>
                 </div>
@@ -120,7 +145,9 @@ export default function Dashboard({ navigate }) {
       )}
 
       {/* Quick Actions */}
-      <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--primary-dark)", marginBottom: 16 }} className="anim-fade-up-3">Quick Actions</h2>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--primary-dark)", marginBottom: 16 }} className="anim-fade-up-3">
+        Quick Actions
+      </h2>
       <div className="grid-4 anim-fade-up-3" style={{ marginBottom: 32 }}>
         {quickActions.map(a => (
           <div key={a.id} onClick={() => navigate(a.id)}
@@ -134,51 +161,55 @@ export default function Dashboard({ navigate }) {
         ))}
       </div>
 
-      {/* Featured Wellness Experts */}
-      <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--primary-dark)", marginBottom: 16 }} className="anim-fade-up-4">
-        💪 Featured Wellness Experts
-      </h2>
-      <div className="card anim-fade-up-4" style={{ marginBottom: 28 }}>
-        <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>
-          Book certified yoga instructors and gym trainers. All sessions managed securely through Mitabhukta.
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
-          {TRAINERS_DATA.map(trainer => (
-            <div key={trainer.id} style={{ background: "var(--bg-muted)", borderRadius: "var(--radius-md)", padding: 16, border: "1px solid var(--border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-                <div style={{ width: 44, height: 44, borderRadius: "50%", background: trainer.gender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
-                  {trainer.typeIcon}
+      {/* Featured Wellness Experts — from Firestore */}
+      {featuredTrainers.length > 0 && (
+        <>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "var(--primary-dark)", marginBottom: 16 }} className="anim-fade-up-4">
+            💪 Featured Wellness Experts
+          </h2>
+          <div className="card anim-fade-up-4" style={{ marginBottom: 28 }}>
+            <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 20 }}>
+              Book certified yoga instructors and gym trainers. All sessions managed securely through Mitabhukta.
+            </p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16, marginBottom: 20 }}>
+              {featuredTrainers.map(trainer => (
+                <div key={trainer.id} style={{ background: "var(--bg-muted)", borderRadius: "var(--radius-md)", padding: 16, border: "1px solid var(--border)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: "50%", background: trainer.gender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>
+                      {trainer.typeIcon || getTypeIcon(trainer.type)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{trainer.name}</div>
+                      <div style={{ fontSize: 11, color: "var(--primary)", fontWeight: 600 }}>{trainer.type}</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>🎯 {trainer.speciality}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>📍 {trainer.location}</div>
+                  <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>⭐ {trainer.rating || "New"} · {trainer.experience} yrs exp</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "var(--primary-dark)", marginBottom: 14 }}>₹{trainer.pricePerHour}/hr</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={{ flex: 1, padding: "8px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-xs)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
+                      onClick={() => navigate("trainers")}>
+                      View Profile
+                    </button>
+                    <button style={{ flex: 1, padding: "8px", background: "#fff", color: "var(--primary)", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-xs)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
+                      onClick={() => navigate("my-bookings")}>
+                      Book Now
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>{trainer.name}</div>
-                  <div style={{ fontSize: 11, color: "var(--primary)", fontWeight: 600 }}>{trainer.type}</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>🎯 {trainer.speciality}</div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>📍 {trainer.location}</div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 4 }}>⭐ {trainer.rating} · {trainer.experience} yrs exp</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "var(--primary-dark)", marginBottom: 14 }}>₹{trainer.pricePerHour}/hr</div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button style={{ flex: 1, padding: "8px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-xs)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
-                  onClick={() => navigate("trainers")}>
-                  View Profile
-                </button>
-                <button style={{ flex: 1, padding: "8px", background: "#fff", color: "var(--primary)", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-xs)", fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
-                  onClick={() => navigate("my-bookings")}>
-                  Book Now
-                </button>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
-          <div style={{ padding: "12px 16px", background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--primary-dark)", flex: 1 }}>
-            🌟 Are you a trainer? <strong>Partner with Mitabhukta</strong> and reach thousands of users.{" "}
-            <a href="mailto:trainers@mitabhukta.com" style={{ color: "var(--primary)", fontWeight: 700 }}>Apply now →</a>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+              <div style={{ padding: "12px 16px", background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", fontSize: 13, color: "var(--primary-dark)", flex: 1 }}>
+                🌟 Are you a trainer? <strong>Partner with Mitabhukta</strong> and reach thousands of users.{" "}
+                <a href="mailto:trainers@mitabhukta.com" style={{ color: "var(--primary)", fontWeight: 700 }}>Apply now →</a>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={() => navigate("trainers")}>View All Trainers →</button>
+            </div>
           </div>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate("trainers")}>View All Trainers →</button>
-        </div>
-      </div>
+        </>
+      )}
 
       {/* Plan features */}
       <div className="card anim-fade-up-4">
