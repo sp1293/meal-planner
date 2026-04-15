@@ -241,8 +241,12 @@ textarea.form-control { resize: vertical; line-height: 1.6; }
   .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; }
   .page,.page-sm,.page-md { padding:28px 16px; }
   .hide-mobile { display:none !important; }
+  .show-mobile-only { display:flex !important; }
   .card { padding:20px; }
   .navbar-inner { padding:0 16px !important; }
+}
+@media (min-width:769px) {
+  .show-mobile-only { display:none !important; }
 }
 @media (max-width:480px) {
   .btn-lg { padding:13px 20px; font-size:15px; }
