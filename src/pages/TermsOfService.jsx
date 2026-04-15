@@ -1,108 +1,77 @@
 export default function TermsOfService({ navigate }) {
+  const s = {
+    page:    { maxWidth:800, margin:"0 auto", padding:"48px 24px", fontFamily:"var(--font-body)" },
+    h1:      { fontFamily:"var(--font-display)", fontSize:32, color:"var(--primary-dark)", marginBottom:8 },
+    h2:      { fontFamily:"var(--font-display)", fontSize:20, color:"var(--primary-dark)", marginTop:36, marginBottom:10 },
+    p:       { fontSize:15, lineHeight:1.8, color:"var(--text-2)", marginBottom:14 },
+    li:      { fontSize:15, lineHeight:1.8, color:"var(--text-2)", marginBottom:6 },
+    meta:    { fontSize:13, color:"var(--text-4)", marginBottom:32 },
+    divider: { border:"none", borderTop:"1px solid var(--border)", margin:"32px 0" },
+  };
   return (
-    <div className="page-md" style={{ margin: "0 auto", padding: "48px 24px" }}>
-      <div className="page-title anim-fade-up">
-        <h1>📋 Terms of Service</h1>
-        <p>Last updated: April 2026 · Please read carefully before using Mitabhukta</p>
-      </div>
+    <div style={s.page}>
+      <button onClick={() => navigate && navigate("landing")}
+        style={{ background:"none", border:"none", color:"var(--primary)", cursor:"pointer", fontSize:14, marginBottom:24, padding:0, fontFamily:"var(--font-body)" }}>
+        ← Back
+      </button>
+      <h1 style={s.h1}>Terms of Service</h1>
+      <p style={s.meta}>Last updated: April 2025 · Effective: April 2025</p>
+      <p style={s.p}>Welcome to Mitabhukta. By accessing or using our platform, you agree to be bound by these Terms of Service. Please read them carefully.</p>
+      <hr style={s.divider} />
 
-      <div className="card anim-fade-up-2" style={{ marginBottom: 20, background: "var(--primary-pale)", border: "1px solid var(--primary-soft)" }}>
-        <p style={{ fontSize: 14, color: "var(--primary-dark)", lineHeight: 1.8 }}>
-          These Terms of Service ("Terms") govern your use of Mitabhukta ("Service"), operated by Mitabhukta ("we", "us", "our"), based in Bengaluru, Karnataka, India. By using our Service, you agree to these Terms. If you disagree, please do not use the Service.
-        </p>
-      </div>
+      <h2 style={s.h2}>1. About Mitabhukta</h2>
+      <p style={s.p}>Mitabhukta is an AI-powered Indian wellness platform providing personalized meal planning, calorie tracking, leftover recipe generation, and certified trainer booking. We are operated from Bengaluru, India.</p>
+      <p style={s.p}>Our platform uses Claude AI (by Anthropic) to generate meal recommendations. These are for general wellness only and do not constitute medical advice.</p>
 
-      {[
-        {
-          title: "1. Acceptance of Terms",
-          items: [
-            { subtitle: "Agreement", text: "By creating an account or using Mitabhukta, you confirm that you are at least 13 years of age and agree to be bound by these Terms and our Privacy Policy." },
-            { subtitle: "Updates", text: "We may update these Terms at any time. We will notify you of significant changes via email or in-app notice. Continued use after changes constitutes acceptance." },
-          ],
-        },
-        {
-          title: "2. Use of the Service",
-          items: [
-            { subtitle: "Permitted use", text: "Mitabhukta is for personal, non-commercial use. You may use it to plan meals, track nutrition, book trainer sessions, and access wellness features." },
-            { subtitle: "Prohibited use", text: "You may not: scrape or copy our AI-generated content for commercial purposes, impersonate other users, attempt to hack or disrupt the service, share your account credentials, or use the platform for any unlawful purpose." },
-            { subtitle: "Account responsibility", text: "You are responsible for all activity under your account. Keep your password secure and notify us immediately of any unauthorized access at support@mitabhukta.com." },
-          ],
-        },
-        {
-          title: "3. Subscriptions & Payments",
-          items: [
-            { subtitle: "Pricing", text: "Subscription prices are displayed in Indian Rupees (₹) and include applicable taxes. Prices may change with 30 days notice." },
-            { subtitle: "Billing", text: "Subscriptions are billed monthly via Razorpay. Your subscription auto-renews unless cancelled before the renewal date." },
-            { subtitle: "Refunds", text: "We offer a 7-day refund on first-time subscriptions if you are not satisfied. Refunds are processed within 5-7 business days to your original payment method." },
-            { subtitle: "Cancellation", text: "You can cancel your subscription anytime from Account Settings. Cancellation takes effect at the end of your current billing period." },
-          ],
-        },
-        {
-          title: "4. Trainer Bookings",
-          items: [
-            { subtitle: "Platform-only transactions", text: "All trainer bookings and payments must be made through Mitabhukta. Off-platform payments are prohibited and void our service guarantees." },
-            { subtitle: "Cancellation policy", text: "Session cancellations 12+ hours before are fully refunded. Cancellations within 12 hours may incur fees as detailed in our booking policy." },
-            { subtitle: "Trainer conduct", text: "Mitabhukta vets all trainers but is not liable for the content of advice given during sessions. Always consult a qualified medical professional before starting any fitness program." },
-          ],
-        },
-        {
-          title: "5. AI-Generated Content",
-          items: [
-            { subtitle: "Not medical advice", text: "Meal plans, calorie estimates, and nutrition information generated by Mitabhukta are for informational purposes only and do not constitute medical or dietary advice. Always consult a registered dietitian or doctor for medical nutrition therapy." },
-            { subtitle: "Accuracy", text: "AI-generated content may not always be accurate. Calorie estimates from photos are approximations. Always verify nutritional information if you have specific medical dietary requirements." },
-            { subtitle: "Intellectual property", text: "AI-generated meal plans are provided for your personal use only. You may not resell or commercially distribute them." },
-          ],
-        },
-        {
-          title: "6. User Content",
-          items: [
-            { subtitle: "Your data", text: "Data you enter (meal logs, health goals, booking notes) remains yours. We use it only to provide the Service as described in our Privacy Policy." },
-            { subtitle: "Reviews", text: "By submitting a trainer review, you grant us a non-exclusive license to display it on the platform. Reviews must be honest and not defamatory." },
-          ],
-        },
-        {
-          title: "7. Limitation of Liability",
-          items: [
-            { subtitle: "Service availability", text: "We aim for 99% uptime but do not guarantee uninterrupted access. We are not liable for losses due to service outages." },
-            { subtitle: "Health disclaimer", text: "Mitabhukta is a wellness tool, not a medical device. We are not responsible for any health outcomes resulting from use of our Service. Always seek professional medical advice." },
-            { subtitle: "Maximum liability", text: "To the fullest extent permitted by Indian law, our total liability to you shall not exceed the amount you paid us in the 3 months preceding any claim." },
-          ],
-        },
-        {
-          title: "8. Termination",
-          items: [
-            { subtitle: "By you", text: "You may close your account at any time from Account Settings or by emailing support@mitabhukta.com." },
-            { subtitle: "By us", text: "We may suspend or terminate accounts that violate these Terms, with or without notice. Serious violations (fraud, harassment, off-platform payments) result in immediate permanent termination." },
-          ],
-        },
-        {
-          title: "9. Governing Law",
-          items: [
-            { subtitle: "Jurisdiction", text: "These Terms are governed by the laws of India. Any disputes shall be subject to the exclusive jurisdiction of courts in Bengaluru, Karnataka." },
-            { subtitle: "Dispute resolution", text: "We encourage resolving disputes amicably first. Contact us at support@mitabhukta.com. If unresolved, disputes shall be settled by arbitration under the Arbitration and Conciliation Act, 1996." },
-          ],
-        },
-      ].map((section, i) => (
-        <div key={i} className="card anim-fade-up-3" style={{ marginBottom: 16 }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)", marginBottom: 16 }}>{section.title}</h2>
-          {section.items.map((item, j) => (
-            <div key={j} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: j < section.items.length - 1 ? "1px solid var(--border)" : "none" }}>
-              <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 4 }}>{item.subtitle}</div>
-              <p style={{ fontSize: 14, color: "var(--text-3)", lineHeight: 1.7, margin: 0 }}>{item.text}</p>
-            </div>
-          ))}
-        </div>
-      ))}
+      <h2 style={s.h2}>2. Eligibility</h2>
+      <p style={s.p}>You must be at least 13 years old to use Mitabhukta. By using our services, you confirm that all information you provide is accurate and you will not use the platform for any unlawful purpose.</p>
 
-      <div className="card" style={{ textAlign: "center", padding: 32 }}>
-        <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, color: "var(--primary-dark)", marginBottom: 10 }}>Questions about these Terms?</h3>
-        <p style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 16 }}>Contact our legal team:</p>
-        <a href="mailto:legal@mitabhukta.com" className="btn btn-primary btn-sm">📧 legal@mitabhukta.com</a>
-        <div style={{ display: "flex", gap: 16, justifyContent: "center", marginTop: 20, flexWrap: "wrap" }}>
-          <button onClick={() => navigate("privacy")} style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-body)" }}>Privacy Policy</button>
-          <button onClick={() => navigate("guidelines")} style={{ background: "none", border: "none", color: "var(--primary)", cursor: "pointer", fontSize: 14, fontFamily: "var(--font-body)" }}>Platform Guidelines</button>
-        </div>
+      <h2 style={s.h2}>3. Account Registration</h2>
+      <p style={s.p}>You are responsible for maintaining the confidentiality of your login credentials. Notify us immediately at <a href="mailto:support@mitabhukta.com" style={{ color:"var(--primary)" }}>support@mitabhukta.com</a> if you suspect unauthorized access.</p>
+
+      <h2 style={s.h2}>4. Subscription Plans and Payments</h2>
+      <p style={s.p}>Mitabhukta offers a free tier and paid subscription plans billed monthly via Razorpay.</p>
+      <ul>
+        <li style={s.li}><strong>Free Plan:</strong> 2 AI meal plans per month</li>
+        <li style={s.li}><strong>Starter Plan (₹299/mo):</strong> Increased limits and shopping lists</li>
+        <li style={s.li}><strong>Pro Plan (₹599/mo):</strong> Unlimited plans and all features</li>
+        <li style={s.li}><strong>Family Plan (₹999/mo):</strong> All Pro features for up to 5 profiles</li>
+      </ul>
+      <p style={s.p}>Subscription fees are non-refundable except where required by law. We reserve the right to change pricing with 30 days' notice.</p>
+
+      <h2 style={s.h2}>5. Trainer Booking</h2>
+      <p style={s.p}>All bookings and payments must be made exclusively through Mitabhukta. You agree to:</p>
+      <ul>
+        <li style={s.li}>Never pay trainers directly outside the platform</li>
+        <li style={s.li}>Not share personal contact information with trainers</li>
+        <li style={s.li}>Honor our cancellation policy (12+ hrs = full refund; 6–12 hrs = 10% fee; 1–6 hrs = 20% fee; &lt;1 hr = 50% fee)</li>
+        <li style={s.li}>Treat trainers with respect and professionalism</li>
+      </ul>
+
+      <h2 style={s.h2}>6. AI-Generated Content</h2>
+      <p style={s.p}>Meal plans and nutritional information are for general wellness only. They do not constitute medical advice. Always consult a qualified healthcare provider before making significant dietary changes.</p>
+
+      <h2 style={s.h2}>7. Acceptable Use</h2>
+      <p style={s.p}>You agree not to hack, scrape, abuse, or misuse the platform in any way. Accounts that violate these terms may be suspended or terminated.</p>
+
+      <h2 style={s.h2}>8. Intellectual Property</h2>
+      <p style={s.p}>All content on Mitabhukta is owned by or licensed to us. You may not reproduce or distribute our content without written permission.</p>
+
+      <h2 style={s.h2}>9. Limitation of Liability</h2>
+      <p style={s.p}>Our total liability to you for any claim shall not exceed the amount you paid us in the 3 months preceding the claim. Mitabhukta is a wellness tool, not a medical device.</p>
+
+      <h2 style={s.h2}>10. Governing Law</h2>
+      <p style={s.p}>These Terms are governed by the laws of India. Disputes are subject to the exclusive jurisdiction of courts in Bengaluru, Karnataka.</p>
+
+      <h2 style={s.h2}>11. Contact</h2>
+      <div style={{ background:"var(--bg-muted)", borderRadius:"var(--radius-md)", padding:"16px 20px", fontSize:14, lineHeight:2, color:"var(--text-2)" }}>
+        <strong>Mitabhukta</strong><br/>
+        Email: <a href="mailto:legal@mitabhukta.com" style={{ color:"var(--primary)" }}>legal@mitabhukta.com</a><br/>
+        Support: <a href="mailto:support@mitabhukta.com" style={{ color:"var(--primary)" }}>support@mitabhukta.com</a><br/>
+        Location: Bengaluru, Karnataka, India
       </div>
+      <hr style={s.divider} />
+      <p style={{ fontSize:13, color:"var(--text-4)" }}>© {new Date().getFullYear()} Mitabhukta. All rights reserved.</p>
     </div>
   );
 }

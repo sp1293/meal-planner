@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import "./styles/global.css";
 
+import ErrorBoundary from "./components/ErrorBoundary";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { SubProvider } from "./context/SubContext";
 
-import Navbar         from "./components/Navbar";
+import Navbar from "./components/Navbar";
 import { Footer, LoadingSpinner } from "./components";
 
 import Landing        from "./pages/Landing";
@@ -53,39 +54,25 @@ function PWAInstallBanner() {
     if (outcome === "accepted") setShow(false);
   }
   return (
-    <div style={{ position: "fixed", bottom: 20, left: 20, right: 20, zIndex: 9999, maxWidth: 400, margin: "0 auto" }}>
-      <div style={{ background: "#166534", color: "#fff", borderRadius: 16, padding: "16px 20px", display: "flex", gap: 14, alignItems: "center", boxShadow: "0 8px 32px rgba(0,0,0,0.2)" }}>
-        <img src="/logo192.png" alt="" style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0 }} />
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>Install Mitabhukta</div>
-          <div style={{ fontSize: 12, opacity: 0.85 }}>Add to home screen for quick access</div>
+    <div style={{ position:"fixed", bottom:20, left:20, right:20, zIndex:9999, maxWidth:400, margin:"0 auto" }}>
+      <div style={{ background:"#166534", color:"#fff", borderRadius:16, padding:"16px 20px", display:"flex", gap:14, alignItems:"center", boxShadow:"0 8px 32px rgba(0,0,0,0.2)" }}>
+        <img src="/logo192.png" alt="" style={{ width:32, height:32, borderRadius:8, flexShrink:0 }} />
+        <div style={{ flex:1 }}>
+          <div style={{ fontWeight:700, fontSize:14, marginBottom:2 }}>Install Mitabhukta</div>
+          <div style={{ fontSize:12, opacity:0.85 }}>Add to home screen for quick access</div>
         </div>
-        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-          <button onClick={install} style={{ padding: "8px 16px", background: "#fff", color: "#166534", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>Install</button>
-          <button onClick={() => { localStorage.setItem("pwa_dismissed","1"); setShow(false); }} style={{ background: "none", border: "none", color: "rgba(255,255,255,0.7)", fontSize: 20, cursor: "pointer", padding: 0 }}>✕</button>
+        <div style={{ display:"flex", gap:8, flexShrink:0 }}>
+          <button onClick={install} style={{ padding:"8px 16px", background:"#fff", color:"#166534", border:"none", borderRadius:8, fontSize:13, fontWeight:700, cursor:"pointer" }}>Install</button>
+          <button onClick={() => { localStorage.setItem("pwa_dismissed","1"); setShow(false); }} style={{ background:"none", border:"none", color:"rgba(255,255,255,0.7)", fontSize:20, cursor:"pointer", padding:0 }}>✕</button>
         </div>
       </div>
     </div>
   );
 }
 
-// Pages that non-logged-in users can see
-// NOTE: "guidelines", "privacy", "terms" are accessible to everyone — logged in or not
-const PUBLIC_ONLY_PAGES = new Set([
-  "landing", "login", "signup", "early-access", "auth-action",
-]);
-
-// Pages that redirect to landing if not logged in
-const PROTECTED_PAGES = new Set([
-  "dashboard","planner","my-plans","account","subscription",
-  "trainers","my-bookings","referral","admin","trainer-portal",
-  "calories","goals","leftover-chef",
-]);
-
-// Pages accessible by anyone regardless of auth state
-const OPEN_PAGES = new Set([
-  "guidelines", "privacy", "terms", "early-access", "auth-action",
-]);
+const PUBLIC_ONLY_PAGES = new Set(["landing","login","signup","early-access","auth-action"]);
+const PROTECTED_PAGES   = new Set(["dashboard","planner","my-plans","account","subscription","trainers","my-bookings","referral","admin","trainer-portal","calories","goals","leftover-chef"]);
+const OPEN_PAGES        = new Set(["guidelines","privacy","terms","early-access","auth-action"]);
 
 function InnerApp() {
   const { user, loading, role } = useAuth();
@@ -93,17 +80,14 @@ function InnerApp() {
 
   function navigate(p) {
     setPage(p);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top:0, behavior:"smooth" });
   }
 
   useEffect(() => {
     if (loading) return;
-
     if (user && user.emailVerified) {
       setPage(prev => {
-        // Always allow open pages
         if (OPEN_PAGES.has(prev)) return prev;
-        // Redirect away from login/signup/landing
         if (!PUBLIC_ONLY_PAGES.has(prev)) return prev;
         if (role === "trainer") return "trainer-portal";
         if (role === "admin")   return "admin";
@@ -121,9 +105,7 @@ function InnerApp() {
 
   if (loading) {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mode") && params.get("oobCode")) {
-      return <AuthAction navigate={(p) => setPage(p)} />;
-    }
+    if (params.get("mode") && params.get("oobCode")) return <AuthAction navigate={(p) => setPage(p)} />;
     return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
   }
 
@@ -133,14 +115,10 @@ function InnerApp() {
   const showFooter = !["login","signup","trainer-portal","auth-action"].includes(page);
 
   function renderPage() {
-    // Logged-in verified user on login/signup/landing → dashboard
     if (user && user.emailVerified && PUBLIC_ONLY_PAGES.has(page) && page !== "early-access" && page !== "auth-action") {
       return <Dashboard navigate={navigate} />;
     }
-    // Logged-out on protected page → landing
-    if (!user && PROTECTED_PAGES.has(page)) {
-      return <Landing navigate={navigate} />;
-    }
+    if (!user && PROTECTED_PAGES.has(page)) return <Landing navigate={navigate} />;
 
     switch (page) {
       case "landing":        return <Landing navigate={navigate} />;
@@ -169,9 +147,9 @@ function InnerApp() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column" }}>
       {showNavbar && <Navbar page={page} navigate={navigate} />}
-      <main style={{ flex: 1 }}>{renderPage()}</main>
+      <main style={{ flex:1 }}>{renderPage()}</main>
       {showFooter && <Footer navigate={navigate} />}
       <PWAInstallBanner />
     </div>
@@ -180,10 +158,12 @@ function InnerApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SubProvider>
-        <InnerApp />
-      </SubProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <SubProvider>
+          <InnerApp />
+        </SubProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }

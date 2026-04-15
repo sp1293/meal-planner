@@ -54,7 +54,7 @@ function VerifyEmailScreen({ email, password, onBackToLogin }) {
         <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 14, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)", textAlign: "left" }}>
           <div style={{ fontWeight: 600, marginBottom: 6 }}>📌 Can't find the email?</div>
           <div style={{ marginBottom: 3 }}>• Check your <strong>spam/junk</strong> folder</div>
-          <div style={{ marginBottom: 3 }}>• Search for "noreply@nourishai-27d26"</div>
+          <div style={{ marginBottom: 3 }}>• Search for "noreply@mitabhukta.com</div>
           <div style={{ marginBottom: 3 }}>• Make sure you used the correct email</div>
           <div>• Wait up to 2 minutes for delivery</div>
         </div>

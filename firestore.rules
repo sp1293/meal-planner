@@ -2,21 +2,15 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Users ──────────────────────────────────────────────────────────────
     match /users/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // ── Trainers ───────────────────────────────────────────────────────────
     match /trainers/{trainerId} {
-      allow read:  if true;
+      allow read:  if request.auth != null;
       allow write: if false;
     }
 
-    // ── Bookings ───────────────────────────────────────────────────────────
-    // Students can read their own bookings.
-    // Trainers can read bookings assigned to them.
-    // Writes only via backend (Admin SDK) — never from client.
     match /bookings/{bookingId} {
       allow read: if request.auth != null && (
         resource.data.studentId == request.auth.uid ||
@@ -25,13 +19,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ── Waitlist ───────────────────────────────────────────────────────────
     match /waitlist/{docId} {
       allow create: if true;
       allow read, update, delete: if false;
     }
 
-    // ── Default deny ───────────────────────────────────────────────────────
     match /{document=**} {
       allow read, write: if false;
     }

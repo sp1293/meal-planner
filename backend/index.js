@@ -535,6 +535,37 @@ app.post("/api/send-welcome", rateLimit(5, 60 * 1000), async (req, res) => {
 });
 
 // ── 404 + error handlers ───────────────────────────────────────────────────
+app.post("/api/trainer-change-password", rateLimit(5, 60000), async (req, res) => {
+  try {
+    const { email, currentPassword, newPassword } = req.body;
+    if (!email || !currentPassword || !newPassword)
+      return res.status(400).json({ error:"All fields are required" });
+    if (newPassword.length < 6)
+      return res.status(400).json({ error:"New password must be at least 6 characters" });
+    const snap = await admin.firestore().collection("trainers")
+      .where("email","==",email.toLowerCase()).limit(1).get();
+    if (snap.empty) return res.status(404).json({ error:"Trainer not found" });
+    const trainerDoc = snap.docs[0];
+    const trainerData = trainerDoc.data();
+    let match = false;
+    if (trainerData.passwordHash) {
+      match = await bcrypt.compare(currentPassword, trainerData.passwordHash);
+    } else if (trainerData.password) {
+      match = trainerData.password === currentPassword;
+    }
+    if (!match) return res.status(401).json({ error:"Current password is incorrect" });
+    const newHash = await bcrypt.hash(newPassword, 12);
+    await trainerDoc.ref.update({
+      passwordHash: newHash,
+      password: admin.firestore.FieldValue.delete(),
+    });
+    console.log(`✅ Trainer password changed: ${email}`);
+    res.json({ success:true });
+  } catch(err) {
+    console.error("Trainer change password error:", err.message);
+    res.status(500).json({ error:"Failed to change password" });
+  }
+});
 app.use((req, res) => res.status(404).json({ error: "Route not found" }));
 app.use((err, req, res, next) => { res.status(500).json({ error: "Internal server error" }); });
 
