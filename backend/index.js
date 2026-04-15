@@ -10,14 +10,10 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const FROM   = "Mitabhukta <noreply@mitabhukta.com>";
 
 // ── Firebase Admin SDK ─────────────────────────────────────────────────────
-// Service account JSON is stored as an env variable in Render
-// Never commit this to GitHub
 if (!admin.apps.length) {
   try {
     const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
+    admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
     console.log("Firebase Admin SDK initialized");
   } catch (err) {
     console.error("Firebase Admin SDK init failed:", err.message);
@@ -76,13 +72,23 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// ── Keep Render awake — ping every 14 minutes ──────────────────────────────
+setInterval(async () => {
+  try {
+    await fetch("https://meal-planner-backend-0ul2.onrender.com/");
+    console.log("Keep-alive ping sent");
+  } catch (e) {
+    console.warn("Keep-alive ping failed:", e.message);
+  }
+}, 14 * 60 * 1000);
+
 // ── Input sanitizer ────────────────────────────────────────────────────────
 function sanitizeString(str, maxLen = 500) {
   if (typeof str !== "string") return "";
   return str.replace(/[<>"'`]/g, "").trim().slice(0, maxLen);
 }
 
-// ── Email HTML builder ─────────────────────────────────────────────────────
+// ── Email HTML templates ───────────────────────────────────────────────────
 function verificationEmailHtml(name, verificationLink) {
   return `<!DOCTYPE html>
 <html>
@@ -218,9 +224,9 @@ app.get("/api/places",
   }
 );
 
-// ── KEY NEW ROUTE: Generate Firebase verification link + send via Resend ───
-// Frontend calls this instead of sendEmailVerification()
-// Admin SDK generates the real Firebase link → Resend sends branded email
+// ── Send verification email via Resend ─────────────────────────────────────
+// Uses Firebase Admin to generate real verification link
+// Sends branded email from noreply@mitabhukta.com via Resend
 app.post("/api/send-verification-email",
   rateLimit(5, 60 * 1000),
   async (req, res) => {
@@ -228,13 +234,11 @@ app.post("/api/send-verification-email",
       const { email, name } = req.body;
       if (!email) return res.status(400).json({ error: "email is required" });
 
-      // Generate real Firebase email verification link
       const verificationLink = await admin.auth().generateEmailVerificationLink(
         email,
         { url: "https://mitabhukta.com" }
       );
 
-      // Send via Resend — from noreply@mitabhukta.com
       await resend.emails.send({
         from: FROM,
         to: email,
@@ -242,7 +246,7 @@ app.post("/api/send-verification-email",
         html: verificationEmailHtml(sanitizeString(name) || "there", verificationLink),
       });
 
-      console.log(`Verification email sent to ${email}`);
+      console.log(`✅ Verification email sent to ${email}`);
       res.json({ success: true });
     } catch (err) {
       console.error("Send verification email error:", err.message);
@@ -251,7 +255,7 @@ app.post("/api/send-verification-email",
   }
 );
 
-// ── Password reset email via Resend ───────────────────────────────────────
+// ── Send password reset email via Resend ───────────────────────────────────
 app.post("/api/send-password-reset",
   rateLimit(5, 60 * 1000),
   async (req, res) => {
@@ -259,7 +263,6 @@ app.post("/api/send-password-reset",
       const { email, name } = req.body;
       if (!email) return res.status(400).json({ error: "email is required" });
 
-      // Generate real Firebase password reset link
       const resetLink = await admin.auth().generatePasswordResetLink(
         email,
         { url: "https://mitabhukta.com" }
@@ -318,6 +321,7 @@ app.post("/api/send-password-reset",
 </html>`,
       });
 
+      console.log(`✅ Password reset email sent to ${email}`);
       res.json({ success: true });
     } catch (err) {
       console.error("Send password reset error:", err.message);
@@ -389,6 +393,7 @@ app.post("/api/send-welcome",
 </html>`,
       });
 
+      console.log(`✅ Welcome email sent to ${email}`);
       res.json({ success: true });
     } catch (err) {
       console.error("Send welcome error:", err.message);
