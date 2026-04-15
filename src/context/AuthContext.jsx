@@ -140,37 +140,42 @@ export function AuthProvider({ children }) {
     return data.trainer;
   }
 
-  async function loginWithEmail(email, password) {
-    try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
-      await cred.user.reload();
-      const freshUser = auth.currentUser;
-
-      if (!freshUser.emailVerified) {
-        suppressAuthChange.current = true;
-        await signOut(auth);
-        suppressAuthChange.current = false;
-        setUser(null); setProfile(null);
-        const err = new Error("Please verify your email before signing in.");
-        err.code = "auth/email-not-verified";
-        throw err;
-      }
-
-      const profileData = await createUserDoc(freshUser);
-      setProfile(profileData); setUser(freshUser);
-      return { user:freshUser, role:"student" };
-
-    } catch(firebaseErr) {
-      if (firebaseErr.code==="auth/email-not-verified") throw firebaseErr;
-      // Try trainer login via secure backend
-      try {
-        const trainer = await loginAsTrainer(email, password);
-        return { user:null, role:"trainer", trainer };
-      } catch {
-        throw firebaseErr;
-      }
-    }
+async function loginWithEmail(email, password) {
+  // First try trainer login via backend — avoids Firebase 400 error entirely
+  // We check if it's a trainer BEFORE trying Firebase Auth
+  try {
+    const trainer = await loginAsTrainer(email, password);
+    return { user:null, role:"trainer", trainer };
+  } catch(trainerErr) {
+    // Not a trainer — now try Firebase Auth for regular users
   }
+
+  // Regular user login via Firebase
+  try {
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    await cred.user.reload();
+    const freshUser = auth.currentUser;
+
+    if (!freshUser.emailVerified) {
+      suppressAuthChange.current = true;
+      await signOut(auth);
+      suppressAuthChange.current = false;
+      setUser(null); setProfile(null);
+      const err = new Error("Please verify your email before signing in.");
+      err.code = "auth/email-not-verified";
+      throw err;
+    }
+
+    const profileData = await createUserDoc(freshUser);
+    setProfile(profileData); setUser(freshUser);
+    return { user:freshUser, role:"student" };
+
+  } catch(firebaseErr) {
+    if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
+    // Show friendly error to user
+    throw firebaseErr;
+  }
+}
 
   async function signupWithEmail(email, password, name, extra={}) {
     suppressAuthChange.current = true;
