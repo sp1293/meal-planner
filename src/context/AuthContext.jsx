@@ -22,18 +22,30 @@ function sanitize(str) {
   return String(str || "").replace(/[<>"'`]/g, "").trim().slice(0, 200);
 }
 
-async function sendEmail(endpoint, body) {
+async function callAPI(endpoint, body) {
   try {
     const res = await fetch(`${API}/api/${endpoint}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) console.warn(`Email send failed: ${endpoint}`, await res.text());
-    return res.ok;
+    const data = await res.json();
+    return { ok: res.ok, data };
   } catch (e) {
-    console.warn(`Email send error: ${endpoint}`, e.message);
-    return false;
+    console.warn(`API call error: ${endpoint}`, e.message);
+    return { ok: false, data: null };
+  }
+}
+
+// Read referral code from URL on page load — stored in sessionStorage
+function getReferralCodeFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) sessionStorage.setItem("mitabhukta_ref", ref.toUpperCase());
+    return sessionStorage.getItem("mitabhukta_ref") || null;
+  } catch {
+    return null;
   }
 }
 
@@ -42,6 +54,11 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const suppressAuthChange = useRef(false);
+
+  useEffect(() => {
+    // Capture referral code from URL on mount
+    getReferralCodeFromURL();
+  }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -58,16 +75,13 @@ export function AuthProvider({ children }) {
             }
             setProfile({ ...existing, emailVerified: firebaseUser.emailVerified });
           } else {
+            // Check if trainer
             try {
               const trainerSnap = await getDocs(
                 query(collection(db, "trainers"),
                   where("email", "==", firebaseUser.email?.toLowerCase()))
               );
-              if (!trainerSnap.empty) {
-                setProfile({ ...trainerSnap.docs[0].data(), role: "trainer" });
-              } else {
-                setProfile(null);
-              }
+              setProfile(trainerSnap.empty ? null : { ...trainerSnap.docs[0].data(), role: "trainer" });
             } catch {
               setProfile(null);
             }
@@ -114,17 +128,14 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── Trainer login — via backend (bcrypt, secure) ───────────────────────────
   async function loginAsTrainer(email, password) {
-    const snap = await getDocs(
-      query(collection(db, "trainers"), where("email", "==", email.toLowerCase()))
-    );
-    if (snap.empty) throw new Error("No trainer found with this email.");
-    const trainer = snap.docs[0].data();
-    if (trainer.password !== password) throw new Error("Incorrect password.");
-    if (trainer.status === "suspended")
-      throw new Error("Your account has been suspended. Contact support@mitabhukta.com.");
-    setProfile({ ...trainer, role: "trainer" });
-    return trainer;
+    const { ok, data } = await callAPI("trainer-login", { email, password });
+    if (!ok || !data?.success) {
+      throw new Error(data?.error || "Trainer login failed.");
+    }
+    setProfile({ ...data.trainer, role: "trainer" });
+    return data.trainer;
   }
 
   // ── Email login ────────────────────────────────────────────────────────────
@@ -132,7 +143,7 @@ export function AuthProvider({ children }) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email, password);
 
-      // Force reload to get fresh emailVerified status from Firebase
+      // Force reload to get fresh emailVerified status
       await cred.user.reload();
       const freshUser = auth.currentUser;
 
@@ -154,6 +165,7 @@ export function AuthProvider({ children }) {
 
     } catch (firebaseErr) {
       if (firebaseErr.code === "auth/email-not-verified") throw firebaseErr;
+      // Try trainer login via secure backend
       try {
         const trainer = await loginAsTrainer(email, password);
         return { user: null, role: "trainer", trainer };
@@ -164,21 +176,25 @@ export function AuthProvider({ children }) {
   }
 
   // ── Email signup ───────────────────────────────────────────────────────────
-  // Uses backend to generate real Firebase link and send via Resend
   async function signupWithEmail(email, password, name, extra = {}) {
     suppressAuthChange.current = true;
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: sanitize(name) });
 
+      try { await sendEmailVerification(cred.user); } catch {}
+
+      // Send branded verification email via backend
+      callAPI("send-verification-email", { email, name: sanitize(name) });
+
       await createUserDoc(cred.user, { displayName: sanitize(name), ...extra });
 
-      // Send branded verification email via Resend (backend generates real Firebase link)
-      // Fire and forget — don't block signup on email sending
-      sendEmail("send-verification-email", {
-        email,
-        name: sanitize(name),
-      });
+      // Auto-apply referral if user came via referral link
+      const refCode = getReferralCodeFromURL();
+      if (refCode) {
+        callAPI("apply-referral", { referralCode: refCode, newUserId: cred.user.uid })
+          .then(() => { try { sessionStorage.removeItem("mitabhukta_ref"); } catch {} });
+      }
 
       await signOut(auth);
     } finally {
@@ -197,26 +213,25 @@ export function AuthProvider({ children }) {
       const needsPrefs = isNew || !snap.data()?.gender;
       const profileData = await createUserDoc(cred.user);
       setProfile(profileData);
+
       if (isNew) {
-        sendEmail("send-welcome", {
-          email: cred.user.email,
-          name:  cred.user.displayName,
-        });
+        callAPI("send-welcome", { email: cred.user.email, name: cred.user.displayName });
+        const refCode = getReferralCodeFromURL();
+        if (refCode) {
+          callAPI("apply-referral", { referralCode: refCode, newUserId: cred.user.uid })
+            .then(() => { try { sessionStorage.removeItem("mitabhukta_ref"); } catch {} });
+        }
       }
+
       return { user: cred.user, needsPrefs };
     } catch (err) {
-      if (
-        err.code === "auth/popup-closed-by-user" ||
-        err.code === "auth/cancelled-popup-request"
-      ) {
+      if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") {
         const e = new Error("Sign-in popup was closed. Please try again.");
-        e.code = err.code;
-        throw e;
+        e.code = err.code; throw e;
       }
       if (err.code === "auth/popup-blocked") {
         const e = new Error("Popup was blocked. Please allow popups for mitabhukta.com.");
-        e.code = "auth/popup-blocked";
-        throw e;
+        e.code = "auth/popup-blocked"; throw e;
       }
       throw err;
     }
@@ -224,24 +239,21 @@ export function AuthProvider({ children }) {
 
   // ── Resend verification email ──────────────────────────────────────────────
   async function resendVerificationEmail(email, password) {
-    // Sign in temporarily to validate credentials, then send via backend
     suppressAuthChange.current = true;
     try {
-      const cred = await signInWithEmailAndPassword(auth, email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       await signOut(auth);
     } finally {
       suppressAuthChange.current = false;
     }
     setUser(null);
     setProfile(null);
-    // Send via backend (generates real Firebase link + Resend branded email)
-    await sendEmail("send-verification-email", { email, name: "" });
+    await callAPI("send-verification-email", { email, name: "" });
   }
 
-  // ── Password reset — fully via backend + Resend ───────────────────────────
+  // ── Password reset ─────────────────────────────────────────────────────────
   async function resetPassword(email) {
-    // Backend generates real Firebase reset link and sends via Resend
-    const ok = await sendEmail("send-password-reset", { email, name: "" });
+    const { ok } = await callAPI("send-password-reset", { email, name: "" });
     if (!ok) throw new Error("Failed to send reset email. Please try again.");
   }
 

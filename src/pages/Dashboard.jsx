@@ -1,14 +1,15 @@
 import { useState, useEffect } from "react";
-import { collection, getDocs, query, where, limit } from "firebase/firestore";
+import { collection, getDocs, query, where, limit, orderBy } from "firebase/firestore";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useSub } from "../context/SubContext";
 import { TIERS } from "../config";
 
 export default function Dashboard({ navigate }) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const { plan } = useSub();
-  const [featuredTrainers, setFeaturedTrainers] = useState([]);
+  const [featuredTrainers,  setFeaturedTrainers]  = useState([]);
+  const [upcomingBookings,  setUpcomingBookings]  = useState([]);
 
   const name         = profile?.displayName?.split(" ")[0] || "there";
   const plansUsed    = profile?.plansUsed || 0;
@@ -16,15 +17,9 @@ export default function Dashboard({ navigate }) {
   const usagePercent = plan.plansPerMonth >= 999 ? 0 : Math.min(100, (plansUsed / plan.plansPerMonth) * 100);
   const tierInfo     = TIERS[plan.id];
 
-  const STORAGE_KEY = `mitabhukta_bookings_${profile?.uid || "guest"}`;
-  let upcomingBookings = [];
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    upcomingBookings = saved ? JSON.parse(saved).slice(0, 3) : [];
-  } catch {}
-
+  // Load featured trainers from Firestore
   useEffect(() => {
-    async function loadFeaturedTrainers() {
+    async function loadTrainers() {
       try {
         const snap = await getDocs(
           query(collection(db, "trainers"), where("status", "!=", "suspended"), limit(4))
@@ -34,8 +29,31 @@ export default function Dashboard({ navigate }) {
         setFeaturedTrainers([]);
       }
     }
-    loadFeaturedTrainers();
+    loadTrainers();
   }, []);
+
+  // Load upcoming bookings from Firestore
+  useEffect(() => {
+    if (!user?.uid) return;
+    async function loadBookings() {
+      try {
+        const snap = await getDocs(
+          query(
+            collection(db, "bookings"),
+            where("studentId", "==", user.uid),
+            where("status", "in", ["Confirmed", "Rescheduled"])
+          )
+        );
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // Sort by dateIso ascending (soonest first)
+        data.sort((a, b) => (a.dateIso || "").localeCompare(b.dateIso || ""));
+        setUpcomingBookings(data.slice(0, 3));
+      } catch {
+        setUpcomingBookings([]);
+      }
+    }
+    loadBookings();
+  }, [user?.uid]);
 
   function getTypeIcon(type) {
     const icons = { "Yoga Instructor": "🧘", "Gym Trainer": "🏋️", "Nutritionist": "🥗", "Physiotherapist": "🩺" };
@@ -54,7 +72,7 @@ export default function Dashboard({ navigate }) {
   return (
     <div className="page" style={{ paddingTop: 24, paddingBottom: 24 }}>
 
-      {/* Header — compact */}
+      {/* Header */}
       <div style={{ marginBottom: 20 }} className="anim-fade-up">
         <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(20px, 3vw, 28px)", color: "var(--primary-dark)", marginBottom: 2 }}>
           Good {getTimeOfDay()}, {name}! 👋
@@ -62,13 +80,13 @@ export default function Dashboard({ navigate }) {
         <p style={{ fontSize: 14, color: "var(--text-3)" }}>Here's your Mitabhukta overview.</p>
       </div>
 
-      {/* Stats — compact row */}
+      {/* Stats */}
       <div className="grid-4 anim-fade-up-2" style={{ marginBottom: 16 }}>
         {[
-          { label: "Current Plan",     value: plan.name,   sub: `${plan.priceLabel}${plan.period}`, subColor: tierInfo.color },
-          { label: "Plans Used",       value: plansUsed,   sub: plan.plansPerMonth >= 999 ? "Unlimited" : `of ${plan.plansPerMonth}/mo` },
-          { label: "Plans Remaining",  value: plansLeft,   sub: plan.plansPerMonth >= 999 ? "No limit" : "this month" },
-          { label: "Sessions Booked",  value: upcomingBookings.length, sub: "trainer sessions" },
+          { label: "Current Plan",    value: plan.name,  sub: `${plan.priceLabel}${plan.period}`, subColor: tierInfo.color },
+          { label: "Plans Used",      value: plansUsed,  sub: plan.plansPerMonth >= 999 ? "Unlimited" : `of ${plan.plansPerMonth}/mo` },
+          { label: "Plans Remaining", value: plansLeft,  sub: plan.plansPerMonth >= 999 ? "No limit" : "this month" },
+          { label: "Sessions Booked", value: upcomingBookings.length, sub: "upcoming sessions" },
         ].map(s => (
           <div key={s.label} className="stat-card" style={{ padding: "14px 16px" }}>
             <div className="label" style={{ fontSize: 11 }}>{s.label}</div>
@@ -78,7 +96,7 @@ export default function Dashboard({ navigate }) {
         ))}
       </div>
 
-      {/* Usage bar — compact */}
+      {/* Usage bar */}
       {plan.plansPerMonth < 999 && (
         <div className="card anim-fade-up-2" style={{ marginBottom: 16, padding: "14px 16px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6, fontSize: 12 }}>
@@ -91,15 +109,13 @@ export default function Dashboard({ navigate }) {
           {usagePercent > 80 && (
             <div style={{ marginTop: 8, fontSize: 12, color: "var(--red-500)", fontWeight: 500 }}>
               ⚠️ Running low!{" "}
-              <button onClick={() => navigate("subscription")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>
-                Upgrade →
-              </button>
+              <button onClick={() => navigate("subscription")} style={{ color: "var(--primary)", background: "none", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 12 }}>Upgrade →</button>
             </div>
           )}
         </div>
       )}
 
-      {/* Upcoming sessions — compact */}
+      {/* Upcoming sessions from Firestore */}
       {upcomingBookings.length > 0 && (
         <div style={{ marginBottom: 16 }} className="anim-fade-up-2">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -132,7 +148,7 @@ export default function Dashboard({ navigate }) {
         </div>
       )}
 
-      {/* Quick Actions — compact 6-grid */}
+      {/* Quick Actions */}
       <div style={{ marginBottom: 16 }} className="anim-fade-up-3">
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: 16, color: "var(--primary-dark)", marginBottom: 10 }}>Quick Actions</h2>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 10 }}>
@@ -148,7 +164,7 @@ export default function Dashboard({ navigate }) {
         </div>
       </div>
 
-      {/* Featured Trainers — compact horizontal scroll */}
+      {/* Featured Trainers */}
       {featuredTrainers.length > 0 && (
         <div style={{ marginBottom: 16 }} className="anim-fade-up-4">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -167,8 +183,8 @@ export default function Dashboard({ navigate }) {
                     <div style={{ fontSize: 11, color: "var(--primary)", fontWeight: 600 }}>{trainer.speciality}</div>
                   </div>
                 </div>
-                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 2 }}>⭐ {trainer.rating || "New"} · {trainer.experience} yrs · ₹{trainer.pricePerHour}/hr</div>
-                <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 10 }}>⭐ {trainer.rating || "New"} · {trainer.experience} yrs · ₹{trainer.pricePerHour}/hr</div>
+                <div style={{ display: "flex", gap: 6 }}>
                   <button style={{ flex: 1, padding: "6px", background: "var(--primary)", color: "#fff", border: "none", borderRadius: "var(--radius-xs)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
                     onClick={() => navigate("trainers")}>Profile</button>
                   <button style={{ flex: 1, padding: "6px", background: "#fff", color: "var(--primary)", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-xs)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-body)" }}
@@ -180,7 +196,7 @@ export default function Dashboard({ navigate }) {
         </div>
       )}
 
-      {/* Plan features — compact */}
+      {/* Plan features */}
       <div className="card anim-fade-up-4" style={{ padding: "16px 20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <h3 style={{ fontFamily: "var(--font-display)", fontSize: 15, color: "var(--primary-dark)", margin: 0 }}>Your {plan.name} Plan</h3>

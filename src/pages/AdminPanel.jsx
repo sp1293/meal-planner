@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { collection, getDocs, doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { collection, getDocs, doc, setDoc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase";
+
+const API = process.env.REACT_APP_API_URL?.replace("/api/meal-plan", "")
+  || "https://meal-planner-backend-0ul2.onrender.com";
 
 function sanitize(str) {
   return String(str).replace(/[<>"'`]/g, "").trim();
@@ -13,6 +16,13 @@ const SPECIALITIES = [
   "Zumba", "Pilates", "Nutrition Coaching", "Personal Training",
 ];
 
+const TYPE_ICONS = {
+  "Yoga Instructor": "🧘",
+  "Gym Trainer":     "🏋️",
+  "Nutritionist":    "🥗",
+  "Physiotherapist": "🩺",
+};
+
 export default function AdminPanel({ navigate }) {
   const { profile } = useAuth();
   const [trainers,      setTrainers]      = useState([]);
@@ -22,6 +32,7 @@ export default function AdminPanel({ navigate }) {
   const [error,         setError]         = useState("");
   const [success,       setSuccess]       = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+
   const [form, setForm] = useState({
     name: "", email: "", password: "", type: "Yoga Instructor",
     speciality: "Hatha Yoga", location: "Bengaluru",
@@ -32,12 +43,10 @@ export default function AdminPanel({ navigate }) {
 
   const DAY_OPTIONS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
-  // ── useEffect MUST be before any early return ──────────────────────────────
   useEffect(() => {
     if (profile?.role === "admin") loadTrainers();
   }, [profile?.role]);
 
-  // ── Only admin can access ──────────────────────────────────────────────────
   if (profile?.role !== "admin") {
     return (
       <div className="page text-center" style={{ paddingTop: 80 }}>
@@ -54,7 +63,7 @@ export default function AdminPanel({ navigate }) {
     try {
       const snap = await getDocs(collection(db, "trainers"));
       setTrainers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    } catch (e) {
+    } catch {
       setError("Failed to load trainers.");
     } finally {
       setLoading(false);
@@ -74,9 +83,11 @@ export default function AdminPanel({ navigate }) {
     }));
   }
 
+  // ── Create trainer via backend — bcrypt password + invite email ────────────
   async function createTrainer(e) {
     e.preventDefault();
     setError(""); setSuccess("");
+
     if (!form.name || !form.email || !form.password) { setError("Name, email and password are required."); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (!form.experience || isNaN(form.experience)) { setError("Please enter valid years of experience."); return; }
@@ -85,35 +96,38 @@ export default function AdminPanel({ navigate }) {
 
     setCreating(true);
     try {
-      const trainerId = `trainer_${Date.now()}`;
-      const trainerData = {
-        id:            trainerId,
-        name:          sanitize(form.name),
-        email:         sanitize(form.email).toLowerCase(),
-        password:      form.password,
-        type:          form.type,
-        typeIcon:      form.type === "Yoga Instructor" ? "🧘" : "🏋️",
-        speciality:    form.speciality,
-        location:      sanitize(form.location),
-        experience:    parseInt(form.experience),
-        pricePerHour:  parseInt(form.pricePerHour),
-        gender:        form.gender,
-        bio:           sanitize(form.bio),
-        languages:     form.languages.split(",").map(l => sanitize(l)),
-        availableDays: form.availableDays,
-        sessionTypes:  ["Video call","In-person"],
-        rating:        0,
-        totalSessions: 0,
-        totalEarnings: 0,
-        highlights:    [],
-        role:          "trainer",
-        status:        "active",
-        createdAt:     serverTimestamp(),
-        createdBy:     profile.uid,
-      };
-      await setDoc(doc(db, "trainers", trainerId), trainerData);
-      setTrainers(prev => [...prev, trainerData]);
-      setSuccess(`✅ Trainer "${form.name}" created! Share their email and password with them to login.`);
+      const res = await fetch(`${API}/api/create-trainer`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          adminUid: profile.uid,
+          trainerData: {
+            name:          sanitize(form.name),
+            email:         sanitize(form.email).toLowerCase(),
+            password:      form.password,
+            type:          form.type,
+            typeIcon:      TYPE_ICONS[form.type] || "💪",
+            speciality:    form.speciality,
+            location:      sanitize(form.location),
+            experience:    parseInt(form.experience),
+            pricePerHour:  parseInt(form.pricePerHour),
+            gender:        form.gender,
+            bio:           sanitize(form.bio),
+            languages:     form.languages.split(",").map(l => sanitize(l.trim())).filter(Boolean),
+            availableDays: form.availableDays,
+          },
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setError(data.error || "Failed to create trainer.");
+        return;
+      }
+
+      setTrainers(prev => [...prev, data.trainer]);
+      setSuccess(`✅ Trainer "${form.name}" created! An invite email has been sent to ${form.email} with their login credentials.`);
       setShowForm(false);
       setForm({
         name: "", email: "", password: "", type: "Yoga Instructor",
@@ -122,8 +136,8 @@ export default function AdminPanel({ navigate }) {
         bio: "", languages: "English, Kannada",
         availableDays: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
       });
-    } catch (e) {
-      setError("Failed to create trainer: " + e.message);
+    } catch (err) {
+      setError("Failed to create trainer. Please try again.");
     } finally {
       setCreating(false);
     }
@@ -196,6 +210,12 @@ export default function AdminPanel({ navigate }) {
             <h3 style={{ fontFamily: "var(--font-display)", fontSize: 20, color: "var(--primary-dark)" }}>Create New Trainer Account</h3>
             <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 20, color: "var(--text-3)" }}>✕</button>
           </div>
+
+          {/* Info banner */}
+          <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "var(--radius-sm)", padding: 14, marginBottom: 20, fontSize: 13, color: "#14532d" }}>
+            📧 <strong>Automatic invite:</strong> Once you create the account, the trainer will automatically receive a welcome email with their login credentials. No need to share manually!
+          </div>
+
           <form onSubmit={createTrainer}>
             <div className="grid-2">
               <div className="form-group">
@@ -203,12 +223,12 @@ export default function AdminPanel({ navigate }) {
                 <input className="form-control" type="text" placeholder="Trainer full name" value={form.name} onChange={e => setField("name", e.target.value)} required maxLength={60} />
               </div>
               <div className="form-group">
-                <label>Email Address * <span style={{ fontSize: 11, color: "var(--text-4)" }}>(used to login)</span></label>
+                <label>Email Address * <span style={{ fontSize: 11, color: "var(--text-4)" }}>(invite will be sent here)</span></label>
                 <input className="form-control" type="email" placeholder="trainer@email.com" value={form.email} onChange={e => setField("email", e.target.value)} required />
               </div>
               <div className="form-group">
-                <label>Password * <span style={{ fontSize: 11, color: "var(--text-4)" }}>(min 6 characters)</span></label>
-                <input className="form-control" type="password" placeholder="Create a password for them" value={form.password} onChange={e => setField("password", e.target.value)} required minLength={6} />
+                <label>Temporary Password * <span style={{ fontSize: 11, color: "var(--text-4)" }}>(trainer should change after first login)</span></label>
+                <input className="form-control" type="text" placeholder="Create a temporary password" value={form.password} onChange={e => setField("password", e.target.value)} required minLength={6} />
               </div>
               <div className="form-group">
                 <label>Gender</label>
@@ -222,6 +242,8 @@ export default function AdminPanel({ navigate }) {
                 <select className="form-control" value={form.type} onChange={e => setField("type", e.target.value)}>
                   <option>Yoga Instructor</option>
                   <option>Gym Trainer</option>
+                  <option>Nutritionist</option>
+                  <option>Physiotherapist</option>
                 </select>
               </div>
               <div className="form-group">
@@ -262,12 +284,9 @@ export default function AdminPanel({ navigate }) {
                 ))}
               </div>
             </div>
-            <div style={{ background: "#fff8e1", border: "1px solid #fde68a", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 16, fontSize: 13, color: "#92400e" }}>
-              📋 After creating, share the <strong>email and password</strong> with the trainer. They login at the main login page and get redirected to their trainer portal.
-            </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button type="submit" className="btn btn-primary" disabled={creating}>
-                {creating ? <><span className="spin">⟳</span> Creating...</> : "Create Trainer Account"}
+                {creating ? <><span className="spin">⟳</span> Creating & Sending Invite...</> : "✅ Create & Send Invite Email"}
               </button>
               <button type="button" className="btn btn-ghost" onClick={() => setShowForm(false)}>Cancel</button>
             </div>
@@ -292,7 +311,7 @@ export default function AdminPanel({ navigate }) {
         </div>
       )}
 
-      {/* Trainer cards */}
+      {/* Trainer list */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 48, color: "var(--text-3)" }}>
           <span className="spin" style={{ fontSize: 32 }}>⟳</span>
@@ -309,13 +328,20 @@ export default function AdminPanel({ navigate }) {
             <div key={trainer.id} className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 14 }}>
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                 <div style={{ width: 52, height: 52, borderRadius: "50%", background: trainer.gender === "Female" ? "#fce4ec" : "#e8f5e9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, flexShrink: 0 }}>
-                  {trainer.typeIcon || "👤"}
+                  {trainer.typeIcon || TYPE_ICONS[trainer.type] || "👤"}
                 </div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 15, color: "var(--text)", marginBottom: 2 }}>{trainer.name}</div>
                   <div style={{ fontSize: 13, color: "var(--primary)", marginBottom: 2 }}>{trainer.type} · {trainer.speciality}</div>
                   <div style={{ fontSize: 12, color: "var(--text-3)" }}>
                     📧 {trainer.email} · 📍 {trainer.location} · ₹{trainer.pricePerHour}/hr · {trainer.experience} yrs
+                  </div>
+                  {/* Show security badge */}
+                  <div style={{ marginTop: 4 }}>
+                    {trainer.passwordHash
+                      ? <span style={{ fontSize: 10, background: "#dcfce7", color: "#14532d", padding: "2px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 }}>🔒 Secure</span>
+                      : <span style={{ fontSize: 10, background: "#fee2e2", color: "#991b1b", padding: "2px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 }}>⚠️ Legacy — will migrate on next login</span>
+                    }
                   </div>
                 </div>
               </div>
@@ -327,7 +353,7 @@ export default function AdminPanel({ navigate }) {
                 <button className="btn btn-ghost btn-sm" onClick={() => toggleStatus(trainer)} style={{ fontSize: 12 }}>
                   {trainer.status === "active" ? "Suspend" : "Reactivate"}
                 </button>
-                <button className="btn btn-sm" onClick={() => setDeleteConfirm(trainer)}
+                <button onClick={() => setDeleteConfirm(trainer)}
                   style={{ fontSize: 12, background: "#fff5f5", color: "var(--red-500)", border: "1px solid #fecaca", borderRadius: "var(--radius-xs)", padding: "6px 12px", cursor: "pointer", fontFamily: "var(--font-body)" }}>
                   Remove
                 </button>
@@ -343,7 +369,7 @@ export default function AdminPanel({ navigate }) {
           "Never share admin credentials with anyone.",
           "Always verify trainer certifications before creating accounts.",
           "Suspended trainers cannot accept new bookings.",
-          "Review platform guidelines regularly to ensure compliance.",
+          "Trainer passwords are hashed with bcrypt — never stored in plain text.",
         ].map((r, i) => (
           <div key={i} style={{ display: "flex", gap: 8, fontSize: 13, color: "var(--primary-dark)", marginBottom: 6 }}>
             <span>🔒</span> {r}
