@@ -85,23 +85,23 @@ function InnerApp() {
 
   useEffect(() => {
     if (loading) return;
+    if (role === "trainer") return;
     if (user && user.emailVerified) {
       setPage(prev => {
         if (OPEN_PAGES.has(prev)) return prev;
         if (!PUBLIC_ONLY_PAGES.has(prev)) return prev;
-        if (role === "trainer") return "trainer-portal";
-        if (role === "admin")   return "admin";
+        if (role === "admin") return "admin";
         return "dashboard";
       });
     } else if (!user) {
       setPage(prev => {
         if (prev === "auth-action") return prev;
-        if (OPEN_PAGES.has(prev))   return prev;
+        if (OPEN_PAGES.has(prev)) return prev;
         return PROTECTED_PAGES.has(prev) ? "landing" : prev;
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, loading, user?.emailVerified]);
+  }, [user, loading, role, user?.emailVerified]);
 
   if (loading) {
     const params = new URLSearchParams(window.location.search);
@@ -109,7 +109,7 @@ function InnerApp() {
     return <LoadingSpinner fullPage message="Loading Mitabhukta..." />;
   }
 
-  if (user && user.emailVerified && role === "trainer") return <TrainerPortal navigate={navigate} />;
+  if (role === "trainer") return <TrainerPortal navigate={navigate} />;
 
   const showNavbar = !["trainer-portal","auth-action"].includes(page);
   const showFooter = !["login","signup","trainer-portal","auth-action"].includes(page);
