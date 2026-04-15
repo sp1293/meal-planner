@@ -25,7 +25,7 @@ export default function Navbar({ page, navigate }) {
     navigate("landing");
   }
 
-  // ── 5 main nav links shown in header (not personal) ───────────────────────
+  // ── 5 main links in header (not in dropdown) ──────────────────────────────
   const mainLinks = user ? [
     { label: "Dashboard",     id: "dashboard" },
     { label: "Meal Planner",  id: "planner" },
@@ -34,7 +34,7 @@ export default function Navbar({ page, navigate }) {
     { label: "Early Access",  id: "early-access" },
   ] : [];
 
-  // ── Personal items only in hamburger dropdown ─────────────────────────────
+  // ── Personal items only in profile dropdown (no duplication) ─────────────
   const dropdownItems = role === "admin"
     ? [
         { label: "⚙️ Admin Panel",        id: "admin" },
@@ -68,9 +68,7 @@ export default function Navbar({ page, navigate }) {
     right:     { display: "flex", alignItems: "center", gap: 10, flexShrink: 0 },
     tierBadge: { padding: "4px 10px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: plan.colorLight || "var(--green-100)", color: plan.color || "var(--green-800)" },
     adminBadge:{ padding: "4px 10px", borderRadius: "var(--radius-full)", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".5px", background: "#fee2e2", color: "#991b1b" },
-    avatar:    { width: 34, height: 34, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, cursor: "pointer", border: "2px solid var(--primary-soft)", flexShrink: 0 },
-    hamburger: { width: 34, height: 34, borderRadius: "var(--radius-sm)", background: "none", border: "1px solid var(--border)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, cursor: "pointer", padding: 0 },
-    bar:       { width: 16, height: 2, background: "var(--text-3)", borderRadius: 2, display: "block" },
+    avatar:    { width: 36, height: 36, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 700, cursor: "pointer", border: "2px solid var(--primary-soft)" },
     dropdown:  { position: "absolute", top: 46, right: 0, background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "8px", boxShadow: "var(--shadow-lg)", minWidth: 220, zIndex: 300, animation: "slideDown 0.2s ease forwards", maxHeight: "80vh", overflowY: "auto" },
     dropItem:  { width: "100%", padding: "9px 14px", borderRadius: "var(--radius-xs)", fontSize: 14, color: "var(--text-2)", background: "none", border: "none", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-body)", display: "block", transition: "background 0.15s" },
   };
@@ -83,11 +81,11 @@ export default function Navbar({ page, navigate }) {
       <div style={s.inner}>
         {/* Brand */}
         <div style={s.brand} onClick={() => navigate(user ? "dashboard" : "landing")}>
-          <img src="/logo192.png" alt="Mitabhukta" style={{ width: 34, height: 34, borderRadius: 10, objectFit: "cover" }} />
+          <img src="/logo192.png" alt="Mitabhukta" style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }} />
           <span style={s.brandName}>Mitabhukta</span>
         </div>
 
-        {/* 5 Main nav links in header — visible when logged in */}
+        {/* 5 main links in header only */}
         {user && (
           <div style={s.links} className="hide-mobile">
             {mainLinks.map(l => (
@@ -115,25 +113,17 @@ export default function Navbar({ page, navigate }) {
         <div style={s.right}>
           {user ? (
             <>
-              {/* Tier / Admin badge */}
               {role === "admin"
                 ? <span style={s.adminBadge}>Admin</span>
                 : <span style={s.tierBadge}>{plan.name}</span>}
 
-              {/* Avatar — shows name */}
-              <div style={s.avatar}>
-                {profile?.photoURL
-                  ? <img src={profile.photoURL} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
-                  : initials}
-              </div>
-
-              {/* Hamburger — personal items only */}
+              {/* Profile icon — personal items only, no duplication */}
               <div style={{ position: "relative" }} ref={dropdownRef}>
-                <button style={s.hamburger} onClick={() => setMenuOpen(o => !o)} aria-label="Menu">
-                  <span style={s.bar} />
-                  <span style={s.bar} />
-                  <span style={s.bar} />
-                </button>
+                <div style={s.avatar} onClick={() => setMenuOpen(o => !o)}>
+                  {profile?.photoURL
+                    ? <img src={profile.photoURL} alt="" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                    : initials}
+                </div>
 
                 {menuOpen && (
                   <div style={s.dropdown} onClick={() => setMenuOpen(false)}>
@@ -144,7 +134,7 @@ export default function Navbar({ page, navigate }) {
                       {role === "admin" && <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700, marginTop: 2 }}>Administrator</div>}
                     </div>
 
-                    {/* Personal nav items */}
+                    {/* Personal items only */}
                     {dropdownItems.map(item => (
                       <button key={item.id}
                         style={{
