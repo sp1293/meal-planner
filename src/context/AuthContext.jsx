@@ -27,7 +27,7 @@ async function callAPI(endpoint, body) {
     const token = await getAuthToken();
     const headers = { "Content-Type":"application/json" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
-    const res = await fetch(`${API}/api/${endpoint}`, {
+    const res  = await fetch(`${API}/api/${endpoint}`, {
       method:"POST", headers, body:JSON.stringify(body),
     });
     const data = await res.json();
@@ -58,6 +58,19 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (suppressAuthChange.current) return;
+
+      // Check if we have a trainer session stored
+      try {
+        const trainerSession = sessionStorage.getItem("trainer_session");
+        if (trainerSession && !firebaseUser) {
+          const trainer = JSON.parse(trainerSession);
+          setProfile({ ...trainer, role:"trainer" });
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+      } catch {}
+
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
@@ -69,10 +82,7 @@ export function AuthProvider({ children }) {
             }
             setProfile({ ...existing, emailVerified:firebaseUser.emailVerified });
           } else {
-            try {
-              const trainerSnap = await getDocs(query(collection(db,"trainers"),where("email","==",firebaseUser.email?.toLowerCase())));
-              setProfile(trainerSnap.empty ? null : { ...trainerSnap.docs[0].data(), role:"trainer" });
-            } catch { setProfile(null); }
+            setProfile(null);
           }
         } catch { setProfile(null); }
       } else {
@@ -114,10 +124,19 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // ── Trainer login — via backend JWT, never reads Firestore client-side ────
   async function loginAsTrainer(email, password) {
     const { ok, data } = await callAPI("trainer-login",{ email, password });
     if (!ok||!data?.success) throw new Error(data?.error||"Trainer login failed.");
+
+    // Store trainer session in sessionStorage — survives page refresh
+    try {
+      sessionStorage.setItem("trainer_token",   data.token);
+      sessionStorage.setItem("trainer_session", JSON.stringify(data.trainer));
+    } catch {}
+
     setProfile({ ...data.trainer, role:"trainer" });
+    setUser(null);
     return data.trainer;
   }
 
@@ -126,6 +145,7 @@ export function AuthProvider({ children }) {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       await cred.user.reload();
       const freshUser = auth.currentUser;
+
       if (!freshUser.emailVerified) {
         suppressAuthChange.current = true;
         await signOut(auth);
@@ -135,13 +155,20 @@ export function AuthProvider({ children }) {
         err.code = "auth/email-not-verified";
         throw err;
       }
+
       const profileData = await createUserDoc(freshUser);
       setProfile(profileData); setUser(freshUser);
       return { user:freshUser, role:"student" };
+
     } catch(firebaseErr) {
       if (firebaseErr.code==="auth/email-not-verified") throw firebaseErr;
-      try { const trainer=await loginAsTrainer(email,password); return { user:null, role:"trainer", trainer }; }
-      catch { throw firebaseErr; }
+      // Try trainer login via secure backend
+      try {
+        const trainer = await loginAsTrainer(email, password);
+        return { user:null, role:"trainer", trainer };
+      } catch {
+        throw firebaseErr;
+      }
     }
   }
 
@@ -205,6 +232,11 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    // Clear trainer session if exists
+    try {
+      sessionStorage.removeItem("trainer_token");
+      sessionStorage.removeItem("trainer_session");
+    } catch {}
     await signOut(auth);
     setUser(null); setProfile(null);
   }
