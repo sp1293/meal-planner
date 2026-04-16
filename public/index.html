@@ -80,7 +80,246 @@
     </script>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run Mitabhukta.</noscript>
+    <noscript>
+  <style>
+    body { margin: 0; font-family: 'Helvetica Neue', Arial, sans-serif; background: #f5f5f0; color: #111827; }
+    .ns-nav { background: #052e16; padding: 16px 24px; display: flex; align-items: center; gap: 10px; }
+    .ns-nav span { color: #fff; font-size: 20px; font-weight: 700; }
+    .ns-hero { background: linear-gradient(135deg, #052e16, #14532d, #166534); padding: 80px 24px; text-align: center; }
+    .ns-hero h1 { color: #fff; font-size: 42px; margin: 0 0 16px; line-height: 1.2; }
+    .ns-hero h1 span { color: #4ade80; }
+    .ns-hero p { color: rgba(255,255,255,0.75); font-size: 18px; max-width: 560px; margin: 0 auto 32px; line-height: 1.7; }
+    .ns-btn { display: inline-block; background: #4ade80; color: #052e16; padding: 16px 36px; border-radius: 10px; font-size: 16px; font-weight: 700; text-decoration: none; }
+    .ns-section { max-width: 1100px; margin: 0 auto; padding: 64px 24px; }
+    .ns-section h2 { font-size: 32px; color: #052e16; margin-bottom: 16px; }
+    .ns-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-top: 32px; }
+    .ns-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; }
+    .ns-card h3 { font-size: 16px; color: #052e16; margin: 12px 0 8px; }
+    .ns-card p { font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0; }
+    .ns-features { background: #fff; }
+    .ns-footer { background: #052e16; color: rgba(255,255,255,0.5); text-align: center; padding: 24px; font-size: 13px; }
+    .ns-price-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 32px; }
+    .ns-price-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 24px; text-align: center; }
+    .ns-price-card .price { font-size: 36px; font-weight: 700; color: #052e16; }
+    .ns-price-card .tier { font-size: 12px; font-weight: 700; color: #16a34a; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+    .ns-price-card ul { list-style: none; padding: 0; margin: 16px 0 0; text-align: left; }
+    .ns-price-card ul li { font-size: 13px; color: #6b7280; padding: 4px 0; }
+    .ns-price-card ul li::before { content: "✓ "; color: #16a34a; font-weight: 700; }
+    .ns-cta { background: #052e16; text-align: center; padding: 80px 24px; }
+    .ns-cta h2 { color: #fff; font-size: 36px; margin-bottom: 16px; }
+    .ns-cta p { color: rgba(255,255,255,0.6); font-size: 16px; margin-bottom: 32px; }
+    .ns-badge { display: inline-block; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 6px 16px; color: rgba(255,255,255,0.85); font-size: 12px; margin-bottom: 24px; }
+    .ns-stats { display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; margin-top: 48px; }
+    .ns-stats div { text-align: center; }
+    .ns-stats .val { font-size: 32px; font-weight: 700; color: #4ade80; }
+    .ns-stats .lbl { font-size: 12px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+    .ns-problem { background: #f5f5f0; }
+    .ns-problem-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 20px; }
+    .ns-problem-card .problem { font-size: 14px; color: #6b7280; margin-bottom: 10px; }
+    .ns-problem-card .solution { font-size: 14px; color: #052e16; font-weight: 600; }
+    @media (max-width: 600px) {
+      .ns-hero h1 { font-size: 28px; }
+      .ns-section h2 { font-size: 24px; }
+      .ns-stats { gap: 24px; }
+    }
+  </style>
+
+  <!-- Navigation -->
+  <div class="ns-nav">
+    <img src="/logo192.png" alt="Mitabhukta" style="width:32px;height:32px;border-radius:8px;" />
+    <span>Mitabhukta</span>
+  </div>
+
+  <!-- Hero -->
+  <div class="ns-hero">
+    <div class="ns-badge">🇮🇳 Built specifically for Indian nutrition &amp; lifestyle</div>
+    <h1>Get a Personalized Indian<br /><span>Weekly Meal Plan in 30 Seconds</span></h1>
+    <p>Tired of deciding what to cook every day? Struggling to maintain a healthy Indian diet? Mitabhukta uses AI to create nutritionist-approved meal plans tailored to your age, goals, and Indian taste — in seconds.</p>
+    <a href="https://mitabhukta.com" class="ns-btn">Generate My Free Meal Plan →</a>
+    <div class="ns-stats">
+      <div><div class="val">4</div><div class="lbl">Age Groups</div></div>
+      <div><div class="val">7-Day</div><div class="lbl">Meal Plans</div></div>
+      <div><div class="val">₹0</div><div class="lbl">To Start</div></div>
+      <div><div class="val">30s</div><div class="lbl">Plan Generated</div></div>
+    </div>
+  </div>
+
+  <!-- Problem / Solution -->
+  <div class="ns-problem">
+    <div class="ns-section">
+      <h2>Sound Familiar?</h2>
+      <p style="color:#6b7280;font-size:15px;">Real problems Mitabhukta solves for Indian families every day.</p>
+      <div class="ns-grid">
+        <div class="ns-problem-card">
+          <div class="problem">😩 "What should I cook today?" — every single day</div>
+          <div class="solution">✅ AI generates your entire week's meal plan in 30 seconds</div>
+        </div>
+        <div class="ns-problem-card">
+          <div class="problem">😕 Healthy eating tips don't account for Indian food</div>
+          <div class="solution">✅ Every plan uses dal, sabzi, roti, rice — real Indian meals</div>
+        </div>
+        <div class="ns-problem-card">
+          <div class="problem">⏰ No time to research nutrition for the whole family</div>
+          <div class="solution">✅ Separate age-appropriate plans for kids, adults and seniors</div>
+        </div>
+        <div class="ns-problem-card">
+          <div class="problem">🏋️ Booked a gym but don't know what to eat around it</div>
+          <div class="solution">✅ Certified trainers + meal plans that complement your fitness goals</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <div class="ns-features">
+    <div class="ns-section">
+      <h2>Everything You Need in One App</h2>
+      <p style="color:#6b7280;font-size:15px;">No more juggling 5 different apps for your health.</p>
+      <div class="ns-grid">
+        <div class="ns-card">
+          <div style="font-size:32px;">🤖</div>
+          <h3>AI Meal Plans</h3>
+          <p>Personalized 7-day Indian meal plans generated in 30 seconds using Claude AI.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">🛒</div>
+          <h3>Smart Shopping Lists</h3>
+          <p>Auto-generated grocery lists organized by category so you never forget an ingredient.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">📊</div>
+          <h3>Nutrition Analysis</h3>
+          <p>Full macro and micronutrient breakdown for every meal in your plan.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">👨‍👩‍👧‍👦</div>
+          <h3>Family Profiles</h3>
+          <p>Separate age-appropriate meal plans for every family member from one account.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">🍳</div>
+          <h3>Leftover Chef</h3>
+          <p>Tell us what's in your fridge. Get healthy Indian recipes instantly. Zero waste.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">💪</div>
+          <h3>Certified Trainers</h3>
+          <p>Book verified yoga and fitness trainers directly through the app. Sessions from ₹400/hr.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Age Groups -->
+  <div style="background:#f5f5f0;">
+    <div class="ns-section">
+      <h2>Built for Every Stage of Life</h2>
+      <div class="ns-grid">
+        <div class="ns-card">
+          <div style="font-size:32px;">🧒</div>
+          <h3>Kids (Under 12)</h3>
+          <p>Fun, colorful meals packed with vitamins for healthy growth. No spicy food. Kid-approved.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">👦</div>
+          <h3>Teens (13–17)</h3>
+          <p>High-protein plans for growing, active bodies and demanding school schedules.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">👤</div>
+          <h3>Adults (18–59)</h3>
+          <p>Balanced macros and practical meal prep that fits a busy professional lifestyle.</p>
+        </div>
+        <div class="ns-card">
+          <div style="font-size:32px;">👴</div>
+          <h3>Seniors (60+)</h3>
+          <p>Heart-healthy, easy-to-digest, anti-inflammatory meals with high calcium and fiber.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pricing -->
+  <div class="ns-features">
+    <div class="ns-section">
+      <h2>Simple, Transparent Pricing</h2>
+      <p style="color:#6b7280;font-size:15px;">Start free. Upgrade when you're ready. No hidden fees ever.</p>
+      <div class="ns-price-grid">
+        <div class="ns-price-card">
+          <div class="tier">Free</div>
+          <div class="price">₹0</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">Forever free</div>
+          <ul>
+            <li>2 AI meal plans per month</li>
+            <li>Basic nutrition info</li>
+            <li>Leftover Chef access</li>
+            <li>Trainer browsing</li>
+          </ul>
+        </div>
+        <div class="ns-price-card" style="border-color:#16a34a;border-width:2px;">
+          <div class="tier">Starter</div>
+          <div class="price">₹299</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">per month</div>
+          <ul>
+            <li>10 meal plans per month</li>
+            <li>Smart shopping lists</li>
+            <li>Full nutrition analysis</li>
+            <li>Trainer booking</li>
+          </ul>
+        </div>
+        <div class="ns-price-card">
+          <div class="tier">Pro</div>
+          <div class="price">₹599</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">per month</div>
+          <ul>
+            <li>Unlimited meal plans</li>
+            <li>All Starter features</li>
+            <li>Priority AI generation</li>
+            <li>Advanced analytics</li>
+          </ul>
+        </div>
+        <div class="ns-price-card">
+          <div class="tier">Family</div>
+          <div class="price">₹999</div>
+          <div style="font-size:13px;color:#6b7280;margin-bottom:16px;">per month</div>
+          <ul>
+            <li>Up to 5 family profiles</li>
+            <li>All Pro features</li>
+            <li>Age-specific plans</li>
+            <li>Family nutrition dashboard</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About / Trust -->
+  <div style="background:#f5f5f0;">
+    <div class="ns-section" style="text-align:center;max-width:700px;">
+      <h2>Why We Built Mitabhukta</h2>
+      <p style="font-size:15px;color:#374151;line-height:1.8;margin-bottom:16px;">
+        Most nutrition apps are built for Western diets. Dal, sabzi, roti, and rice don't fit their calorie models. We built Mitabhukta specifically for Indian households — using AI that actually understands our food, our family structures, and our lifestyle.
+      </p>
+      <p style="font-size:14px;color:#6b7280;line-height:1.7;">
+        Built by a data engineer passionate about Indian nutrition. Every meal plan is validated against established nutritional guidelines for Indian dietary requirements.
+      </p>
+    </div>
+  </div>
+
+  <!-- Final CTA -->
+  <div class="ns-cta">
+    <h2>Stop Guessing What to Cook.<br /><span style="color:#4ade80;">Start Eating Better Today.</span></h2>
+    <p>Join Indian families who have taken the guesswork out of healthy eating. Your personalized meal plan is 30 seconds away.</p>
+    <a href="https://mitabhukta.com" class="ns-btn">Generate My Free Meal Plan →</a>
+    <p style="color:rgba(255,255,255,0.3);font-size:12px;margin-top:16px;">Free forever · No credit card · Takes 30 seconds</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="ns-footer">
+    <p>© 2025 Mitabhukta · Bengaluru, India · <a href="https://mitabhukta.com" style="color:rgba(255,255,255,0.5);">mitabhukta.com</a></p>
+    <p style="margin-top:8px;">AI-Powered Indian Meal Planning · Certified Trainer Booking · Family Nutrition</p>
+  </div>
+</noscript>
     <div id="root"></div>
   </body>
 </html>
