@@ -238,6 +238,7 @@ export default function MyBookings({ navigate }) {
               studentName:   profile?.displayName || "",
               studentEmail:  user.email || "",
               trainerId:     selectedTrainer.id,
+              trainerEmail:  selectedTrainer.email || "",
               trainerName:   selectedTrainer.name,
               trainerIcon:   selectedTrainer.typeIcon || getTypeIcon(selectedTrainer.type),
               trainerGender: selectedTrainer.gender,

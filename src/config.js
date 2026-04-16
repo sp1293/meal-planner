@@ -3,6 +3,15 @@ export const API_URL = process.env.REACT_APP_API_URL || "https://meal-planner-ba
 export const MODEL = "claude-sonnet-4-6";
 export const MAX_TOKENS = 8000;
 
+import { auth } from "./firebase";
+
+async function getIdToken() {
+  try {
+    if (auth.currentUser) return await auth.currentUser.getIdToken();
+  } catch {}
+  return null;
+}
+
 // ─── Subscription Tiers ───────────────────────────────────────────────────────
 export const TIERS = {
   free: {
@@ -187,9 +196,12 @@ export async function callAI(prompt, systemPrompt = "") {
 
   let res;
   try {
+    const token = await getIdToken();
+    const headers = { "Content-Type": "application/json" };
+    if (token) headers["Authorization"] = `Bearer ${token}`;
     res = await fetch(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
   } catch {

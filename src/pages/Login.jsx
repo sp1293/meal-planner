@@ -105,7 +105,7 @@ function ForgotPasswordScreen({ onBack }) {
           </p>
           <div style={{ background: "var(--primary-pale)", borderRadius: "var(--radius-sm)", padding: 12, marginBottom: 20, fontSize: 13, color: "var(--primary-dark)", textAlign: "left" }}>
             <div style={{ marginBottom: 3 }}>• Check your <strong>spam folder</strong> if you don't see it</div>
-            <div style={{ marginBottom: 3 }}>• Search for "noreply@nourishai-27d26"</div>
+            <div style={{ marginBottom: 3 }}>• Search for "noreply@mitabhukta.com"</div>
             <div style={{ marginBottom: 3 }}>• Link expires in 1 hour</div>
             <div>• After resetting, come back and sign in</div>
           </div>

@@ -47,10 +47,20 @@ function getReferralCodeFromURL() {
   } catch { return null; }
 }
 
+function loadTrainerFromStorage() {
+  try {
+    const raw = sessionStorage.getItem("trainer_session");
+    if (!raw) return null;
+    return { ...JSON.parse(raw), role:"trainer" };
+  } catch { return null; }
+}
+
 export function AuthProvider({ children }) {
+  // Hydrate trainer session synchronously so refresh keeps them logged in
+  const initialTrainer = typeof window !== "undefined" ? loadTrainerFromStorage() : null;
   const [user,    setUser]    = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(initialTrainer);
+  const [loading, setLoading] = useState(!initialTrainer);
   const suppressAuthChange = useRef(false);
 
   useEffect(() => { getReferralCodeFromURL(); }, []);
@@ -59,17 +69,16 @@ export function AuthProvider({ children }) {
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       if (suppressAuthChange.current) return;
 
-      // Check if we have a trainer session stored
-      try {
-        const trainerSession = sessionStorage.getItem("trainer_session");
-        if (trainerSession && !firebaseUser) {
-          const trainer = JSON.parse(trainerSession);
-          setProfile({ ...trainer, role:"trainer" });
+      // Trainer session takes precedence when Firebase has no user
+      if (!firebaseUser) {
+        const trainer = loadTrainerFromStorage();
+        if (trainer) {
+          setProfile(trainer);
           setUser(null);
           setLoading(false);
           return;
         }
-      } catch {}
+      }
 
       setUser(firebaseUser);
       if (firebaseUser) {
