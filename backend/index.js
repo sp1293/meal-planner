@@ -12,7 +12,11 @@ const Razorpay   = require("razorpay");
 const app       = express();
 const resend    = new Resend(process.env.RESEND_API_KEY);
 const FROM      = "Mitabhukta <noreply@mitabhukta.com>";
-const JWT_SECRET = process.env.JWT_SECRET || "mitabhukta-trainer-secret-2025";
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET.length < 32) {
+  console.error("❌ FATAL: JWT_SECRET env var is missing or too short (<32 chars). Refusing to start.");
+  process.exit(1);
+}
 
 // ── Firebase Admin SDK ─────────────────────────────────────────────────────
 if (!admin.apps.length) {
