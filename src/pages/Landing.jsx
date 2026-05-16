@@ -5,21 +5,36 @@ import { getVariant, logImpression, logClick } from "../utils/abTest";
 
 const HERO_CTA_TEST = "hero-cta-v1";
 const CTA_VARIANTS  = {
-  A: { label: "Generate My Meal Plan Free →", style: { background: "#4ade80", color: "#052e16" } },
-  B: { label: "Get My Personalized Plan →",   style: { background: "#f97316", color: "#fff"    } },
+  A: { label: "Begin Your Plan →" },
+  B: { label: "Get My Personalized Plan →" },
 };
 
 // Sample meal plan preview — shows users exactly what they get
 const SAMPLE_PLAN = {
   day: "Monday",
   meals: [
-    { type: "Breakfast", name: "Masala Oats with Vegetables", calories: 320, time: "15 min", emoji: "🥣" },
-    { type: "Lunch",     name: "Dal Tadka + Brown Rice + Salad", calories: 480, time: "30 min", emoji: "🍱" },
-    { type: "Snack",     name: "Roasted Chana + Green Tea", calories: 150, time: "5 min",  emoji: "🫛" },
-    { type: "Dinner",    name: "Palak Paneer + 2 Rotis", calories: 420, time: "25 min", emoji: "🥘" },
+    { type: "Breakfast", name: "Masala Oats with Vegetables", calories: 320, time: "15 min" },
+    { type: "Lunch",     name: "Dal Tadka + Brown Rice + Salad", calories: 480, time: "30 min" },
+    { type: "Snack",     name: "Roasted Chana + Green Tea", calories: 150, time: "5 min" },
+    { type: "Dinner",    name: "Palak Paneer + 2 Rotis", calories: 420, time: "25 min" },
   ],
   totalCalories: 1370,
 };
+
+// Inline styles helpers — using CSS variables so the global theme controls colors
+const ink        = "var(--text)";
+const inkSoft    = "var(--text-2)";
+const inkMute    = "var(--text-3)";
+const paper      = "var(--bg)";
+const paperCard  = "var(--bg-card)";
+const paperDeep  = "var(--bg-deep)";
+const walnut     = "var(--walnut-700)";
+const walnutDark = "var(--walnut-800)";
+const gold       = "var(--gold-500)";
+const goldPale   = "var(--gold-50)";
+const line       = "var(--border)";
+const fontDisp   = "var(--font-display)";
+const fontBody   = "var(--font-body)";
 
 export default function Landing({ navigate }) {
   const ctaVariant = useRef(getVariant(HERO_CTA_TEST)).current;
@@ -29,66 +44,175 @@ export default function Landing({ navigate }) {
   useEffect(() => { logImpression(HERO_CTA_TEST, ctaVariant); }, []); // eslint-disable-line
 
   return (
-    <div style={{ fontFamily: "var(--font-body)" }}>
+    <div style={{ background: paper, color: ink, fontFamily: fontBody }}>
 
       {/* ── Early Access Banner ───────────────────────────────────────── */}
-      <div style={{ background: "#4ade80", padding: "10px 24px", textAlign: "center" }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: "#052e16" }}>
-          🎁 Early access: First 100 members get 3 months Pro free!{" "}
+      <div style={{ background: walnutDark, padding: "12px 24px", textAlign: "center" }}>
+        <span style={{ fontSize: 12, color: goldPale, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 500 }}>
+          Early access · First 100 members receive 3 months Pro free.{" "}
           <button onClick={() => navigate("early-access")}
-            style={{ background: "none", border: "none", color: "#052e16", fontSize: 13, fontWeight: 800, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>
+            style={{ background: "none", border: "none", color: "#F0E2C5", fontSize: 12, fontWeight: 500, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit", letterSpacing: "inherit", textTransform: "inherit" }}>
             Claim your spot →
           </button>
         </span>
       </div>
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <section style={{ background: "linear-gradient(135deg,#052e16 0%,#14532d 50%,#166534 100%)", padding: "64px 24px 56px", textAlign: "center", position: "relative", overflow: "hidden" }}>
-        <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 20% 80%,rgba(34,197,94,0.15) 0%,transparent 50%),radial-gradient(circle at 80% 20%,rgba(234,179,8,0.1) 0%,transparent 50%)" }} />
-        <div style={{ maxWidth: 700, margin: "0 auto", position: "relative" }} className="anim-fade-up">
+      {/* ── HERO ──────────────────────────────────────────────────────── */}
+      <section style={{ padding: "60px 0 100px" }}>
+        <div className="container" style={{ display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 80, alignItems: "center" }} className_mobile="hero-inner">
 
-          {/* Emotional hook pill */}
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.2)", borderRadius: "var(--radius-full)", padding: "6px 16px", marginBottom: 24 }}>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.9)", fontWeight: 500 }}>🇮🇳 Built specifically for Indian nutrition & lifestyle</span>
+          <style>{`
+            @media (max-width: 900px) {
+              .hero-grid { grid-template-columns: 1fr !important; gap: 60px !important; }
+              .hero-h1 { font-size: 56px !important; }
+              .hero-art { aspect-ratio: 1/1 !important; }
+              .floating-card { position: static !important; margin: 16px 0 !important; max-width: 100% !important; right: auto !important; left: auto !important; top: auto !important; bottom: auto !important; }
+              .why-h2 { font-size: 40px !important; }
+              .why-grid { grid-template-columns: 1fr !important; gap: 48px !important; }
+              .section-pad { padding: 80px 0 !important; }
+              .final-h2 { font-size: 40px !important; }
+            }
+          `}</style>
+
+          <div className="hero-grid anim-fade-up" style={{ display: "grid", gridTemplateColumns: "1.05fr 1fr", gap: 80, alignItems: "center", width: "100%" }}>
+            <div>
+              {/* Eyebrow */}
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 14, fontSize: 12, color: walnut, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 40, fontWeight: 500 }}>
+                <span style={{ width: 32, height: 1, background: walnut }} />
+                Indian Wellness, Considered
+              </div>
+
+              {/* Headline — premium serif, large, italic emphasis */}
+              <h1 className="hero-h1" style={{ fontFamily: fontDisp, fontSize: 88, fontWeight: 300, lineHeight: 0.98, letterSpacing: "-0.04em", color: ink, marginBottom: 36, fontVariationSettings: '"opsz" 144' }}>
+                The way<br />
+                we should<br />
+                <em style={{ fontStyle: "italic", color: walnut, fontWeight: 300 }}>have been</em><br />
+                eating.
+              </h1>
+
+              {/* Lead */}
+              <p style={{ fontSize: 18, lineHeight: 1.7, color: inkSoft, marginBottom: 44, maxWidth: 460 }}>
+                A quiet practice of intentional, regional Indian meals — designed for your body, your family, and the kitchen you actually cook in.
+              </p>
+
+              {/* CTAs */}
+              <div style={{ display: "flex", gap: 24, alignItems: "center", marginBottom: 48, flexWrap: "wrap" }}>
+                <button
+                  onClick={() => { logClick(HERO_CTA_TEST, ctaVariant); navigate("signup"); }}
+                  style={{ background: walnut, color: paperCard, padding: "18px 36px", border: "none", borderRadius: 2, fontSize: 12, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, transition: "background .2s" }}
+                  onMouseOver={(e) => e.currentTarget.style.background = walnutDark}
+                  onMouseOut={(e) => e.currentTarget.style.background = walnut}>
+                  {cta.label}
+                </button>
+                <button
+                  onClick={() => navigate("how-it-works")}
+                  style={{ background: "none", border: "none", color: ink, fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, paddingBottom: 6, borderBottom: `1px solid ${ink}` }}>
+                  How it works
+                </button>
+              </div>
+
+              {/* Trust line */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, color: inkMute, fontSize: 14, fontStyle: "italic", fontFamily: fontDisp }}>
+                <div style={{ display: "flex" }}>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", border: `2px solid ${paper}`, background: goldPale, color: walnutDark, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisp, fontWeight: 500, fontSize: 12 }}>P</div>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", border: `2px solid ${paper}`, background: walnut, color: paperCard, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisp, fontWeight: 500, fontSize: 12, marginLeft: -8 }}>A</div>
+                  <div style={{ width: 30, height: 30, borderRadius: "50%", border: `2px solid ${paper}`, background: gold, color: paperCard, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: fontDisp, fontWeight: 500, fontSize: 12, marginLeft: -8 }}>M</div>
+                </div>
+                <span>Trusted by 2,400 home kitchens</span>
+              </div>
+            </div>
+
+            {/* Hero illustration with floating cards */}
+            <div className="hero-art" style={{ position: "relative", aspectRatio: "4/5" }}>
+              <div style={{ position: "relative", width: "100%", height: "100%", background: paperDeep, borderRadius: 2, overflow: "hidden" }}>
+                <svg viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%", display: "block" }}>
+                  <rect width="400" height="500" fill="#ECE5D8" />
+                  <circle cx="200" cy="240" r="170" fill="#E8D9BC" opacity="0.5" />
+                  {/* Bowl */}
+                  <ellipse cx="200" cy="290" rx="125" ry="20" fill="#3D311E" />
+                  <path d="M 75 290 Q 75 395 200 395 Q 325 395 325 290 Z" fill="#5C4A2E" />
+                  <ellipse cx="200" cy="290" rx="123" ry="17" fill="#B89968" />
+                  <ellipse cx="200" cy="288" rx="117" ry="12" fill="#8B6E45" />
+                  {/* Food in bowl */}
+                  <circle cx="170" cy="282" r="14" fill="#3D311E" />
+                  <circle cx="200" cy="278" r="16" fill="#A85432" opacity="0.9" />
+                  <circle cx="230" cy="284" r="12" fill="#D4A574" />
+                  <circle cx="185" cy="295" r="10" fill="#B0392A" opacity="0.85" />
+                  <circle cx="215" cy="294" r="8" fill="#D4A03C" />
+                  {/* Steam */}
+                  <path d="M 170 245 Q 165 225 175 205 Q 180 190 170 175" stroke="#5C4A2E" strokeWidth="1.5" fill="none" opacity="0.35" strokeLinecap="round" />
+                  <path d="M 200 240 Q 195 220 205 200 Q 210 185 200 170" stroke="#5C4A2E" strokeWidth="1.5" fill="none" opacity="0.4" strokeLinecap="round" />
+                  <path d="M 230 245 Q 225 225 235 205 Q 240 190 230 175" stroke="#5C4A2E" strokeWidth="1.5" fill="none" opacity="0.35" strokeLinecap="round" />
+                  {/* Spice notes */}
+                  <circle cx="80" cy="140" r="4" fill="#5C4A2E" opacity="0.5" />
+                  <circle cx="340" cy="170" r="3" fill="#B89968" />
+                  <circle cx="60" cy="395" r="4" fill="#D4A574" opacity="0.8" />
+                  <circle cx="350" cy="410" r="5" fill="#5C4A2E" opacity="0.4" />
+                  {/* Museum tag */}
+                  <text x="40" y="465" fontFamily="Fraunces" fontStyle="italic" fontSize="12" fill="#8A8278">No. 1</text>
+                </svg>
+              </div>
+
+              {/* Floating card: top-right */}
+              <div className="floating-card" style={{ position: "absolute", top: 40, right: -36, maxWidth: 220, background: paperCard, border: `1px solid ${line}`, padding: "20px 24px", borderRadius: 2 }}>
+                <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.18em", color: inkMute, marginBottom: 10 }}>Today, for lunch</div>
+                <div style={{ fontFamily: fontDisp, fontSize: 19, fontWeight: 400, color: ink, marginBottom: 6, lineHeight: 1.2, letterSpacing: "-0.01em" }}>Palak Paneer<br />& Phulka</div>
+                <div style={{ fontSize: 12, color: walnut, fontWeight: 500, letterSpacing: "0.02em" }}>480 KCAL · 30 MIN</div>
+              </div>
+
+              {/* Floating card: bottom-left */}
+              <div className="floating-card" style={{ position: "absolute", bottom: 48, left: -40, background: paperCard, border: `1px solid ${line}`, padding: "20px 24px", borderRadius: 2 }}>
+                <div style={{ fontSize: 10, color: walnut, fontWeight: 500, letterSpacing: "0.18em", textTransform: "uppercase", marginBottom: 10 }}>— Family Plan</div>
+                <div style={{ fontFamily: fontDisp, fontSize: 19, fontWeight: 400, color: ink, marginBottom: 6, lineHeight: 1.2, letterSpacing: "-0.01em" }}>Cooked for four</div>
+                <div style={{ fontFamily: fontDisp, fontStyle: "italic", color: gold, fontSize: 13, marginTop: 6 }}>★ ★ ★ ★ ★</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Press line ────────────────────────────────────────────────── */}
+      <div className="container">
+        <div style={{ borderTop: `1px solid ${line}`, padding: "36px 0", textAlign: "center", fontSize: 11, color: inkMute, letterSpacing: "0.24em", textTransform: "uppercase", fontFamily: fontDisp, fontStyle: "italic" }}>
+          <em>As featured in</em>&nbsp;&nbsp;
+          <span style={{ fontStyle: "normal", margin: "0 24px" }}>YourStory</span>·
+          <span style={{ fontStyle: "normal", margin: "0 24px" }}>The Hindu</span>·
+          <span style={{ fontStyle: "normal", margin: "0 24px" }}>Mint</span>·
+          <span style={{ fontStyle: "normal", margin: "0 24px" }}>Vogue India</span>
+        </div>
+      </div>
+
+      {/* ── Why / Mindful eating section ──────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0 140px", background: paperDeep }}>
+        <div className="container">
+          <div style={{ maxWidth: 760, margin: "0 auto 100px", textAlign: "center" }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.24em", textTransform: "uppercase", color: walnut, marginBottom: 32, fontWeight: 500 }}>
+              — A different kind of meal plan —
+            </div>
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 60, fontWeight: 300, lineHeight: 1.05, letterSpacing: "-0.03em", color: ink, marginBottom: 28, fontVariationSettings: '"opsz" 144' }}>
+              Mindful eating, returned to <em style={{ fontStyle: "italic" }}>everyday life</em>.
+            </h2>
+            <p style={{ fontSize: 17, lineHeight: 1.75, color: inkSoft, maxWidth: 560, margin: "0 auto" }}>
+              Mitabhukta — Sanskrit for one who eats with measure — is built around an old idea: that food, made with care for who you are, is itself a form of medicine.
+            </p>
           </div>
 
-          {/* Strong headline */}
-          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(32px,5.5vw,60px)", fontWeight: 700, color: "#fff", lineHeight: 1.1, marginBottom: 20 }}>
-            Get a Personalized Indian<br />
-            <span style={{ color: "#4ade80" }}>Weekly Meal Plan in 30 Seconds</span>
-          </h1>
-
-          {/* Emotional hook */}
-          <p style={{ fontSize: "clamp(15px,2vw,18px)", color: "rgba(255,255,255,0.75)", maxWidth: 520, margin: "0 auto 12px", lineHeight: 1.7 }}>
-            Tired of deciding what to cook every day? Struggling to eat healthy with Indian food?
-          </p>
-          <p style={{ fontSize: "clamp(14px,1.8vw,16px)", color: "rgba(255,255,255,0.55)", maxWidth: 460, margin: "0 auto 32px", lineHeight: 1.6 }}>
-            Mitabhukta uses AI to create nutritionist-approved meal plans tailored to your age, goals, and Indian taste — in seconds. Free to start.
-          </p>
-
-          {/* Single clear CTA */}
-          <div style={{ marginBottom: 16 }}>
-            <button className="btn btn-lg"
-              style={{ ...cta.style, fontWeight: 700, fontSize: 16, padding: "16px 36px", borderRadius: "var(--radius-md)" }}
-              onClick={() => { logClick(HERO_CTA_TEST, ctaVariant); navigate("signup"); }}>
-              {cta.label}
-            </button>
-          </div>
-          <p style={{ fontSize: 12, color: "rgba(255,255,255,0.4)", marginBottom: 40 }}>
-            Free forever · No credit card · Takes 30 seconds
-          </p>
-
-          {/* Trust stats */}
-          <div style={{ display: "flex", justifyContent: "center", gap: 40, flexWrap: "wrap" }}>
+          <div className="why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 72, maxWidth: 1080, margin: "0 auto" }}>
             {[
-              ["4","Age Groups"],
-              ["7‑Day","Meal Plans"],
-              ["₹0","To Start"],
-              ["30s","Plan Generated"],
-            ].map(([val,label]) => (
-              <div key={label} style={{ textAlign: "center" }}>
-                <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 700, color: "#4ade80" }}>{val}</div>
-                <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)", marginTop: 2 }}>{label}</div>
+              { num: "i.", title: "For your body, specifically.", body: "We adapt meals to your conditions — diabetes, PCOS, thyroid, blood pressure — and to the way your particular body asks to be fed." },
+              { num: "ii.", title: "Regional, not generic.", body: "Pongal, thepla, ragi mudde, kosambari. Real dishes from real kitchens — not a softened version of \"Indian food.\"" },
+              { num: "iii.", title: "Guided by humans.", body: "Certified nutritionists, yoga teachers, and physiotherapists you can book — for when an app isn't enough." },
+            ].map((item) => (
+              <div key={item.num}>
+                <div style={{ fontFamily: fontDisp, fontStyle: "italic", fontSize: 56, fontWeight: 300, color: gold, lineHeight: 1, marginBottom: 32, letterSpacing: "-0.02em" }}>
+                  {item.num}
+                </div>
+                <h3 style={{ fontFamily: fontDisp, fontSize: 22, fontWeight: 400, lineHeight: 1.3, marginBottom: 16, color: ink, letterSpacing: "-0.01em", fontVariationSettings: '"opsz" 144' }}>
+                  {item.title}
+                </h3>
+                <p style={{ color: inkSoft, fontSize: 15, lineHeight: 1.7 }}>
+                  {item.body}
+                </p>
               </div>
             ))}
           </div>
@@ -96,236 +220,259 @@ export default function Landing({ navigate }) {
       </section>
 
       {/* ── Sample Meal Plan Preview ──────────────────────────────────── */}
-      <section style={{ padding: "52px 24px", background: "#fff" }}>
-        <div style={{ maxWidth: 860, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <div style={{ display: "inline-block", background: "var(--primary-pale)", color: "var(--primary-dark)", fontSize: 12, fontWeight: 700, padding: "4px 14px", borderRadius: "var(--radius-full)", marginBottom: 12, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              Live Preview
+      <section className="section-pad" style={{ padding: "120px 0", background: paper }}>
+        <div className="container" style={{ maxWidth: 920 }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>
+              — A working week —
             </div>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px,3.5vw,34px)", color: "var(--primary-dark)", marginBottom: 8 }}>
-              Here's What Your Meal Plan Looks Like
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 48, fontWeight: 300, color: ink, marginBottom: 16, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              What <em style={{ fontStyle: "italic" }}>Monday</em> looks like.
             </h2>
-            <p style={{ fontSize: 14, color: "var(--text-3)" }}>
-              AI-generated, nutritionist-approved, 100% Indian meals tailored to your goals
+            <p style={{ fontSize: 16, color: inkSoft, maxWidth: 480, margin: "0 auto", lineHeight: 1.7 }}>
+              A real plan generated by Mitabhukta. Authentic, balanced, achievable.
             </p>
           </div>
 
           {/* Day selector */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 24, flexWrap: "wrap" }}>
-            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day,i) => (
+          <div style={{ display: "flex", gap: 4, justifyContent: "center", marginBottom: 40, flexWrap: "wrap" }}>
+            {["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day, i) => (
               <button key={day} onClick={() => setActiveDay(i)}
-                style={{ padding: "7px 16px", borderRadius: "var(--radius-full)", border: `1.5px solid ${activeDay===i?"var(--primary)":"var(--border)"}`, background: activeDay===i?"var(--primary)":"#fff", color: activeDay===i?"#fff":"var(--text-3)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "var(--font-body)", transition: "var(--transition)" }}>
+                style={{ padding: "10px 20px", border: "none", background: activeDay===i ? ink : "transparent", color: activeDay===i ? paperCard : inkMute, fontSize: 11, fontWeight: 500, letterSpacing: "0.18em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, transition: "all .2s", borderRadius: 2 }}>
                 {day}
               </button>
             ))}
           </div>
 
           {/* Meal cards */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 14, marginBottom: 20 }}>
-            {SAMPLE_PLAN.meals.map(meal => (
-              <div key={meal.type} style={{ background: "var(--bg)", border: "1.5px solid var(--border)", borderRadius: "var(--radius-md)", padding: "18px 16px" }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "var(--text-4)", textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 8 }}>{meal.type}</div>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{meal.emoji}</div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--text)", marginBottom: 8, lineHeight: 1.4 }}>{meal.name}</div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 11, background: "#f0fdf4", color: "var(--primary-dark)", padding: "3px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 }}>🔥 {meal.calories} kcal</span>
-                  <span style={{ fontSize: 11, background: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "var(--radius-full)", fontWeight: 600 }}>⏱ {meal.time}</span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 1, background: line, border: `1px solid ${line}`, marginBottom: 40 }}>
+            {SAMPLE_PLAN.meals.map((meal) => (
+              <div key={meal.type} style={{ background: paperCard, padding: "32px 24px" }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: walnut, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 16 }}>
+                  {meal.type}
+                </div>
+                <div style={{ fontFamily: fontDisp, fontSize: 22, fontWeight: 400, color: ink, marginBottom: 12, lineHeight: 1.25, letterSpacing: "-0.01em" }}>
+                  {meal.name}
+                </div>
+                <div style={{ fontSize: 12, color: inkMute, letterSpacing: "0.06em" }}>
+                  {meal.calories} kcal&nbsp;&nbsp;·&nbsp;&nbsp;{meal.time}
                 </div>
               </div>
             ))}
           </div>
 
           {/* Total + CTA */}
-          <div style={{ background: "linear-gradient(135deg,#052e16,#166534)", borderRadius: "var(--radius-md)", padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ background: walnutDark, padding: "32px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 24 }}>
             <div>
-              <div style={{ fontSize: 13, color: "rgba(255,255,255,0.6)", marginBottom: 4 }}>Daily total · Monday</div>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "#4ade80" }}>
-                {SAMPLE_PLAN.totalCalories} kcal — Balanced Indian Diet
+              <div style={{ fontSize: 11, color: "rgba(245, 241, 234, 0.5)", marginBottom: 8, letterSpacing: "0.16em", textTransform: "uppercase" }}>Daily total</div>
+              <div style={{ fontFamily: fontDisp, fontSize: 28, fontWeight: 400, color: goldPale, letterSpacing: "-0.02em" }}>
+                {SAMPLE_PLAN.totalCalories} kcal — <em style={{ fontStyle: "italic", color: gold }}>balanced</em>
               </div>
-              <div style={{ fontSize: 12, color: "rgba(255,255,255,0.5)", marginTop: 4 }}>
-                Includes macros, shopping list & step-by-step recipes
+              <div style={{ fontSize: 13, color: "rgba(245, 241, 234, 0.5)", marginTop: 6, fontStyle: "italic", fontFamily: fontDisp }}>
+                Includes macros, shopping list, and step-by-step recipes
               </div>
             </div>
-            <button className="btn btn-lg"
-              style={{ background: "#4ade80", color: "#052e16", fontWeight: 700, fontSize: 15, whiteSpace: "nowrap" }}
-              onClick={() => navigate("signup")}>
-              Get My Full 7-Day Plan →
+            <button
+              onClick={() => navigate("signup")}
+              style={{ background: gold, color: walnutDark, padding: "16px 30px", border: "none", borderRadius: 2, fontSize: 12, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, whiteSpace: "nowrap" }}>
+              See the full week →
             </button>
           </div>
         </div>
       </section>
 
-      {/* ── Problem / Solution ────────────────────────────────────────── */}
-      <section style={{ padding: "52px 24px", background: "var(--bg)" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 36 }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px,3.5vw,34px)", color: "var(--primary-dark)", marginBottom: 8 }}>
-              Sound Familiar?
-            </h2>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16, marginBottom: 40 }}>
-            {[
-              { problem: "😩 'What should I cook today?' — every single day", solution: "AI generates your entire week's meal plan in 30 seconds" },
-              { problem: "😕 Healthy eating tips don't account for Indian food", solution: "Every plan uses dal, sabzi, roti, rice — real Indian meals" },
-              { problem: "⏰ No time to research nutrition for the whole family", solution: "Separate age-appropriate plans for kids, adults & seniors" },
-              { problem: "🏋️ Booked a gym but don't know what to eat around it", solution: "Certified trainers + meal plans that complement your fitness goals" },
-            ].map((item, i) => (
-              <div key={i} style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "20px 18px" }}>
-                <div style={{ fontSize: 14, color: "var(--text-3)", marginBottom: 10, lineHeight: 1.5 }}>{item.problem}</div>
-                <div style={{ height: 1, background: "var(--border)", marginBottom: 10 }} />
-                <div style={{ fontSize: 14, color: "var(--primary-dark)", fontWeight: 600, lineHeight: 1.5 }}>✅ {item.solution}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ─────────────────────────────────────────────────── */}
-      <section style={{ padding: "52px 24px", background: "#fff" }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 32 }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px,3.5vw,34px)", color: "var(--primary-dark)", marginBottom: 8 }}>
-              Everything in One App
-            </h2>
-            <p style={{ fontSize: 14, color: "var(--text-3)" }}>No more juggling 5 different apps for your health</p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(200px,1fr))", gap: 14, marginBottom: 32 }}>
-            {[
-              { icon: "🤖", title: "AI Meal Plans",        desc: "Personalized 7-day Indian meal plans generated in 30 seconds." },
-              { icon: "🛒", title: "Shopping Lists",       desc: "Auto-generated grocery lists so you never forget an ingredient." },
-              { icon: "📊", title: "Nutrition Analysis",   desc: "Full macro & micronutrient breakdown for every meal." },
-              { icon: "👨‍👩‍👧‍👦", title: "Family Profiles",    desc: "Different plans for every family member from one account." },
-              { icon: "🍳", title: "Leftover Chef",        desc: "Tell us what's in your fridge. Get Indian recipes instantly." },
-              { icon: "💪", title: "Certified Trainers",   desc: "Book verified yoga & fitness trainers. Sessions from ₹400/hr." },
-            ].map(f => (
-              <div key={f.title} style={{ background: "var(--bg)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "20px 16px" }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>{f.icon}</div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "var(--primary-dark)", marginBottom: 6 }}>{f.title}</div>
-                <p style={{ fontSize: 12, color: "var(--text-3)", lineHeight: 1.6, margin: 0 }}>{f.desc}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Age groups */}
-          <div style={{ background: "var(--primary-dark)", borderRadius: "var(--radius-lg)", padding: "24px 28px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "rgba(255,255,255,0.5)", marginBottom: 16, textTransform: "uppercase", letterSpacing: ".5px" }}>
-              Meal Plans for Every Age
+      {/* ── Features section ─────────────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0", background: paperDeep }}>
+        <div className="container">
+          <div style={{ maxWidth: 720, marginBottom: 80 }}>
+            <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>
+              — Everything in one practice —
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12 }}>
-              {[
-                { icon: "🧒", label: "Kids",    range: "Under 12", desc: "Fun, vitamin-rich meals kids actually enjoy eating." },
-                { icon: "👦", label: "Teens",   range: "13–17",    desc: "High-protein plans for active, growing bodies." },
-                { icon: "👤", label: "Adults",  range: "18–59",    desc: "Balanced macros that fit your busy lifestyle." },
-                { icon: "👴", label: "Seniors", range: "60+",      desc: "Heart-healthy, easy-to-digest, anti-inflammatory meals." },
-              ].map(g => (
-                <div key={g.label} style={{ background: "rgba(255,255,255,0.08)", borderRadius: "var(--radius-md)", padding: "14px 12px" }}>
-                  <div style={{ fontSize: 24, marginBottom: 6 }}>{g.icon}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: "#4ade80" }}>{g.label}</div>
-                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.4)", marginBottom: 6 }}>{g.range}</div>
-                  <p style={{ fontSize: 11, color: "rgba(255,255,255,0.6)", lineHeight: 1.5, margin: 0 }}>{g.desc}</p>
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 56, fontWeight: 300, color: ink, marginBottom: 24, letterSpacing: "-0.03em", lineHeight: 1.05 }}>
+              The full <em style={{ fontStyle: "italic" }}>kitchen practice</em>.
+            </h2>
+            <p style={{ fontSize: 17, color: inkSoft, lineHeight: 1.75 }}>
+              No more juggling five apps for what should be one practice — a quiet, daily ritual.
+            </p>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 0 }}>
+            {[
+              { title: "AI Meal Plans", body: "Personalized 7-day Indian meal plans generated in 30 seconds — built from your goals, conditions, and preferences." },
+              { title: "Shopping Lists", body: "Auto-generated, organized by category. One tap to BigBasket, Blinkit, or Zepto." },
+              { title: "Nutrition Analysis", body: "Macros and micronutrients for every dish — without surrendering taste for tracking." },
+              { title: "Family Profiles", body: "Different plans for every family member from one account. Kids, teens, adults, seniors — each their own." },
+              { title: "Leftover Chef", body: "Tell us what's in your fridge. Get an Indian recipe in seconds. No waste, no waste of mind." },
+              { title: "Certified Trainers", body: "Book verified yoga instructors, gym trainers, and physiotherapists. Sessions from ₹400/hour." },
+            ].map((f, i) => (
+              <div key={f.title} style={{ padding: "40px 32px", borderTop: i < 3 ? `1px solid ${line}` : "none", borderBottom: `1px solid ${line}`, borderRight: (i + 1) % 3 !== 0 ? `1px solid ${line}` : "none", background: paperCard }}>
+                <div style={{ fontFamily: fontDisp, fontStyle: "italic", fontSize: 13, color: gold, marginBottom: 16, letterSpacing: "0.04em" }}>
+                  No. {String(i + 1).padStart(2, "0")}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Trust / About ─────────────────────────────────────────────── */}
-      <section style={{ padding: "52px 24px", background: "var(--bg)" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "var(--primary-pale)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28, margin: "0 auto 20px" }}>🥗</div>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(20px,3vw,28px)", color: "var(--primary-dark)", marginBottom: 14 }}>
-            Why We Built Mitabhukta
-          </h2>
-          <p style={{ fontSize: 15, color: "var(--text-2)", lineHeight: 1.8, marginBottom: 16 }}>
-            Most nutrition apps are built for Western diets. Dal, sabzi, roti, and rice don't fit their calorie models. We built Mitabhukta specifically for Indian households — using AI that actually understands our food, our family structures, and our lifestyle.
-          </p>
-          <p style={{ fontSize: 14, color: "var(--text-3)", lineHeight: 1.7, marginBottom: 28 }}>
-            Built by a data engineer passionate about Indian nutrition. Every meal plan is validated against established nutritional guidelines for Indian dietary requirements.
-          </p>
-          <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
-            {[
-              { icon: "🔒", text: "Your data is private" },
-              { icon: "🤖", text: "Powered by Claude AI" },
-              { icon: "🇮🇳", text: "Made for India" },
-              { icon: "💚", text: "Free to start" },
-            ].map(t => (
-              <div key={t.text} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-3)", background: "#fff", border: "1px solid var(--border)", padding: "8px 16px", borderRadius: "var(--radius-full)" }}>
-                <span>{t.icon}</span><span>{t.text}</span>
+                <h3 style={{ fontFamily: fontDisp, fontSize: 22, fontWeight: 400, color: ink, marginBottom: 12, letterSpacing: "-0.01em" }}>
+                  {f.title}
+                </h3>
+                <p style={{ fontSize: 14, color: inkSoft, lineHeight: 1.7 }}>
+                  {f.body}
+                </p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Pricing ───────────────────────────────────────────────────── */}
-      <section style={{ padding: "52px 24px", background: "#fff" }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(22px,3.5vw,34px)", color: "var(--primary-dark)", marginBottom: 8 }}>
-              Simple, Transparent Pricing
+      {/* ── Age Groups ───────────────────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0", background: paper }}>
+        <div className="container">
+          <div style={{ maxWidth: 720, marginBottom: 64 }}>
+            <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>
+              — For every stage of life —
+            </div>
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 56, fontWeight: 300, color: ink, marginBottom: 24, letterSpacing: "-0.03em", lineHeight: 1.05 }}>
+              From the youngest <em style={{ fontStyle: "italic" }}>to the eldest</em>.
             </h2>
-            <p style={{ fontSize: 14, color: "var(--text-3)" }}>Start free. Upgrade when you're ready. No hidden fees ever.</p>
+          </div>
+
+          <div className="why-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 32 }}>
+            {[
+              { age: "Kids", range: "Under 12", body: "Fun, vitamin-rich meals built around growth, calcium, and the patience of a child's palate." },
+              { age: "Teens", range: "13 – 17", body: "High-protein, high-energy meals for growing bodies and demanding school days." },
+              { age: "Adults", range: "18 – 59", body: "Balanced, sustainable plans for the long arc of a working life and family demands." },
+              { age: "Seniors", range: "60+", body: "Gentle, anti-inflammatory, easy-to-digest meals high in calcium and dietary fiber." },
+            ].map((g, i) => (
+              <div key={g.age} style={{ paddingTop: 28, borderTop: `1px solid ${ink}` }}>
+                <div style={{ fontFamily: fontDisp, fontStyle: "italic", fontSize: 14, color: gold, marginBottom: 24 }}>
+                  — {String(i + 1).padStart(2, "0")}
+                </div>
+                <h3 style={{ fontFamily: fontDisp, fontSize: 28, fontWeight: 400, color: ink, marginBottom: 4, letterSpacing: "-0.02em" }}>
+                  {g.age}
+                </h3>
+                <div style={{ fontSize: 13, color: inkMute, marginBottom: 16, fontStyle: "italic", fontFamily: fontDisp }}>
+                  {g.range}
+                </div>
+                <p style={{ fontSize: 14, color: inkSoft, lineHeight: 1.7 }}>
+                  {g.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── About / Why we built it ──────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0", background: paperDeep }}>
+        <div className="container" style={{ maxWidth: 760, textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 32, fontWeight: 500 }}>
+            — Why we built this —
+          </div>
+          <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 48, fontWeight: 300, color: ink, marginBottom: 32, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+            Western nutrition apps don't know <em style={{ fontStyle: "italic" }}>dal.</em>
+          </h2>
+          <p style={{ fontSize: 17, color: inkSoft, lineHeight: 1.85, marginBottom: 24 }}>
+            Most wellness apps were built for Western kitchens. Dal, sabzi, roti, and rice don't fit their calorie models. Their portion sizes assume a different family. Their flavors, a different palate.
+          </p>
+          <p style={{ fontSize: 17, color: inkSoft, lineHeight: 1.85, marginBottom: 48 }}>
+            We built Mitabhukta for Indian households — for the way we actually cook, eat, and feed the people we love.
+          </p>
+          <div style={{ display: "flex", gap: 32, justifyContent: "center", flexWrap: "wrap", fontSize: 13, color: inkMute, fontStyle: "italic", fontFamily: fontDisp }}>
+            <span>Private by design</span>
+            <span>·</span>
+            <span>Powered by Claude AI</span>
+            <span>·</span>
+            <span>Built in India</span>
+            <span>·</span>
+            <span>Free to begin</span>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Pricing ──────────────────────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0", background: paper }}>
+        <div className="container">
+          <div style={{ maxWidth: 720, marginBottom: 64, textAlign: "center", marginLeft: "auto", marginRight: "auto" }}>
+            <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>
+              — Begin where you are —
+            </div>
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 56, fontWeight: 300, color: ink, marginBottom: 24, letterSpacing: "-0.03em", lineHeight: 1.05 }}>
+              Simple, <em style={{ fontStyle: "italic" }}>transparent</em>.
+            </h2>
+            <p style={{ fontSize: 17, color: inkSoft, lineHeight: 1.7 }}>
+              Start free. Upgrade when you're ready. Cancel any time, without ceremony.
+            </p>
           </div>
           <div className="grid-4" style={{ alignItems: "start" }}>
             {Object.keys(TIERS).map(key => (
               <PricingCard key={key} tierKey={key} currentTier={null} onSelect={() => navigate("signup")} />
             ))}
           </div>
-          <div style={{ textAlign: "center", marginTop: 24 }}>
-            <div style={{ display: "inline-block", background: "var(--primary-pale)", border: "1px solid var(--primary-soft)", borderRadius: "var(--radius-lg)", padding: "16px 28px" }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--primary-dark)" }}>🎁 Early Access —</span>
-              <span style={{ fontSize: 14, color: "var(--text-3)", margin: "0 8px" }}>First 100 members get 3 months Pro free!</span>
-              <button className="btn btn-primary btn-sm" onClick={() => navigate("early-access")}>Claim →</button>
+          <div style={{ textAlign: "center", marginTop: 48 }}>
+            <div style={{ display: "inline-block", borderTop: `1px solid ${line}`, borderBottom: `1px solid ${line}`, padding: "20px 36px" }}>
+              <span style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", fontWeight: 500 }}>Early Access</span>
+              <span style={{ fontSize: 14, color: inkSoft, margin: "0 16px", fontStyle: "italic", fontFamily: fontDisp }}>
+                First 100 members receive 3 months Pro free.
+              </span>
+              <button onClick={() => navigate("early-access")}
+                style={{ background: "none", border: "none", color: walnut, fontSize: 12, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, borderBottom: `1px solid ${walnut}`, paddingBottom: 2 }}>
+                Claim your spot →
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── Testimonials ──────────────────────────────────────────────── */}
-      <section style={{ padding: "48px 24px", background: "var(--bg)" }}>
-        <div style={{ maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(20px,3vw,28px)", color: "var(--primary-dark)", marginBottom: 4 }}>
-              What Early Users Say
+      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "120px 0", background: paperDeep }}>
+        <div className="container" style={{ maxWidth: 1000 }}>
+          <div style={{ textAlign: "center", marginBottom: 80 }}>
+            <div style={{ fontSize: 11, color: walnut, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 24, fontWeight: 500 }}>
+              — From the kitchen —
+            </div>
+            <h2 className="why-h2" style={{ fontFamily: fontDisp, fontSize: 48, fontWeight: 300, color: ink, letterSpacing: "-0.03em", lineHeight: 1.1 }}>
+              What <em style={{ fontStyle: "italic" }}>early readers</em> say.
             </h2>
           </div>
-          <div className="grid-3">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 56 }}>
             {[
-              { name: "Priya S.",  city: "Bengaluru", quote: "Finally an app that actually understands Indian food. The meal plans are practical and my family loves them.", rating: 5 },
-              { name: "Rahul M.",  city: "Hyderabad", quote: "The AI generates a full week of meals in seconds. Better than anything I've seen for Indian nutrition.", rating: 5 },
-              { name: "Ananya K.", city: "Chennai",   quote: "Booked a yoga session through Mitabhukta — so seamless. The trainer knew exactly what I needed.", rating: 5 },
-            ].map(t => (
-              <div key={t.name} style={{ background: "#fff", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "20px 18px" }}>
-                <div style={{ fontSize: 14, color: "#f59e0b", marginBottom: 10 }}>{"★".repeat(t.rating)}</div>
-                <p style={{ fontSize: 14, color: "var(--text-2)", lineHeight: 1.7, marginBottom: 14, fontStyle: "italic" }}>"{t.quote}"</p>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "var(--primary-dark)" }}>{t.name}</div>
-                <div style={{ fontSize: 12, color: "var(--text-4)" }}>{t.city}</div>
+              { quote: "Finally an app that actually understands Indian food. The meal plans are practical and my family loves them.", name: "Priya S.", city: "Bengaluru" },
+              { quote: "The AI generates a full week of meals in seconds. Better than anything I've seen for Indian nutrition.", name: "Rahul M.", city: "Hyderabad" },
+              { quote: "Booked a yoga session through Mitabhukta — seamless. The trainer knew exactly what I needed.", name: "Ananya K.", city: "Chennai" },
+            ].map((t) => (
+              <div key={t.name}>
+                <div style={{ fontFamily: fontDisp, fontSize: 56, fontWeight: 300, color: gold, lineHeight: 0.7, marginBottom: 16, fontStyle: "italic" }}>"</div>
+                <p style={{ fontFamily: fontDisp, fontSize: 19, color: ink, lineHeight: 1.55, marginBottom: 24, fontWeight: 400, letterSpacing: "-0.005em" }}>
+                  {t.quote}
+                </p>
+                <div style={{ fontSize: 12, color: walnut, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+                  {t.name}
+                </div>
+                <div style={{ fontSize: 12, color: inkMute, fontStyle: "italic", fontFamily: fontDisp, marginTop: 4 }}>
+                  {t.city}
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Final CTA ─────────────────────────────────────────────────── */}
-      <section style={{ padding: "56px 24px", background: "var(--primary-dark)", textAlign: "center" }}>
-        <div style={{ maxWidth: 580, margin: "0 auto" }}>
-          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(24px,3.5vw,40px)", color: "#fff", marginBottom: 14, lineHeight: 1.2 }}>
-            Stop Guessing What to Cook.<br />
-            <span style={{ color: "#4ade80" }}>Start Eating Better Today.</span>
+      {/* ── Final CTA ────────────────────────────────────────────────── */}
+      <section className="section-pad" style={{ padding: "140px 0", background: walnutDark, textAlign: "center" }}>
+        <div className="container" style={{ maxWidth: 700 }}>
+          <div style={{ fontSize: 11, color: gold, letterSpacing: "0.24em", textTransform: "uppercase", marginBottom: 32, fontWeight: 500 }}>
+            — Begin today —
+          </div>
+          <h2 className="final-h2" style={{ fontFamily: fontDisp, fontSize: 64, fontWeight: 300, color: goldPale, marginBottom: 28, letterSpacing: "-0.035em", lineHeight: 1.05 }}>
+            The next meal you cook<br />could be <em style={{ fontStyle: "italic", color: gold }}>the right one.</em>
           </h2>
-          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.6)", marginBottom: 28, lineHeight: 1.7 }}>
-            Join Indian families who have taken the guesswork out of healthy eating. Your personalized meal plan is 30 seconds away.
+          <p style={{ fontSize: 17, color: "rgba(243, 233, 212, 0.7)", marginBottom: 48, lineHeight: 1.7, maxWidth: 480, margin: "0 auto 48px" }}>
+            Your first personalized Indian meal plan is thirty seconds away. Free, forever.
           </p>
-          <button className="btn btn-lg"
-            style={{ background: "#4ade80", color: "#052e16", fontWeight: 700, fontSize: 16, padding: "16px 40px", marginBottom: 16 }}
-            onClick={() => { logClick(HERO_CTA_TEST, ctaVariant); navigate("signup"); }}>
-            Generate My Free Meal Plan →
+          <button
+            onClick={() => { logClick(HERO_CTA_TEST, ctaVariant); navigate("signup"); }}
+            style={{ background: gold, color: walnutDark, padding: "20px 44px", border: "none", borderRadius: 2, fontSize: 13, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", cursor: "pointer", fontFamily: fontBody, marginBottom: 24 }}>
+            Begin My Plan →
           </button>
-          <div style={{ display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>✓ Free forever</span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>✓ No credit card</span>
-            <span style={{ fontSize: 12, color: "rgba(255,255,255,0.35)" }}>✓ Ready in 30 seconds</span>
+          <div style={{ fontSize: 12, color: "rgba(243, 233, 212, 0.4)", fontStyle: "italic", fontFamily: fontDisp }}>
+            Free forever · No credit card · Thirty seconds
           </div>
         </div>
       </section>
