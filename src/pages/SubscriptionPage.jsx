@@ -126,7 +126,8 @@ export default function SubscriptionPage({ navigate }) {
 
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-              await updateUserProfile({ tier: tierKey, plansUsed: 0 });
+              // Backend already updated tier via Admin SDK; just refresh local profile from Firestore
+            if (typeof window !== "undefined") setTimeout(() => window.location.reload(), 1500);
               showMsg(`🎉 Successfully upgraded to ${selectedTier.name} plan!`);
             } else {
               showMsg("❌ Payment verification failed. Contact support.", "error");
