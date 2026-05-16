@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { getAuth } from "firebase/auth";
 import { useAuth } from "../context/AuthContext";
 import { useSub } from "../context/SubContext";
 import { TIERS } from "../config";
@@ -7,6 +8,19 @@ import { PricingCard } from "../components";
 const RAZORPAY_KEY = process.env.REACT_APP_RAZORPAY_KEY_ID || "rzp_test_SdZk5BUyxiup3p";
 const API = process.env.REACT_APP_API_URL?.replace("/api/meal-plan", "")
   || "https://meal-planner-backend-0ul2.onrender.com";
+
+// ── Helper: get Firebase auth headers ──────────────────────────────────────
+// Returns headers with the user's Firebase ID token for authenticated API calls.
+// Throws if user is not signed in.
+async function getAuthHeaders() {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error("Not signed in");
+  const token = await user.getIdToken();
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+}
 
 // ── Load Razorpay script ───────────────────────────────────────────────────
 function loadRazorpay() {
@@ -57,14 +71,13 @@ export default function SubscriptionPage({ navigate }) {
         return;
       }
 
-      // Step 2 — Create order on backend
+      // Step 2 — Create order on backend (NOW WITH AUTH HEADER)
       const orderRes = await fetch(`${API}/api/create-order`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getAuthHeaders(),
         body: JSON.stringify({
           tierKey,
-          userId: user.uid,
-          email:  user.email,
+          // userId and email are now read from the auth token on the backend
         }),
       });
 
@@ -97,17 +110,17 @@ export default function SubscriptionPage({ navigate }) {
           },
         },
         handler: async (response) => {
-          // Step 4 — Verify payment on backend
+          // Step 4 — Verify payment on backend (NOW WITH AUTH HEADER)
           try {
             const verifyRes = await fetch(`${API}/api/verify-payment`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: await getAuthHeaders(),
               body: JSON.stringify({
                 razorpay_order_id:   response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature:  response.razorpay_signature,
                 tierKey,
-                userId: user.uid,
+                // userId is now read from the auth token on the backend
               }),
             });
 

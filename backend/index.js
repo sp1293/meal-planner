@@ -53,6 +53,101 @@ app.use(cors({
   allowedHeaders: ["Content-Type","Authorization"],
 }));
 
+// ⚠️ Webhook route MUST be registered BEFORE express.json() because it needs raw body for signature verification.
+// We attach raw body parser only for the webhook route.
+app.post(
+  "/api/razorpay-webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    try {
+      const signature = req.headers["x-razorpay-signature"];
+      const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+      if (!webhookSecret) {
+        console.error("❌ RAZORPAY_WEBHOOK_SECRET not configured");
+        return res.status(500).send("Webhook not configured");
+      }
+      if (!signature) return res.status(400).send("Missing signature");
+
+      // Verify signature using raw body
+      const expected = crypto
+        .createHmac("sha256", webhookSecret)
+        .update(req.body)
+        .digest("hex");
+
+      if (expected !== signature) {
+        console.warn("⚠️ Webhook signature mismatch");
+        return res.status(400).send("Invalid signature");
+      }
+
+      const event = JSON.parse(req.body.toString());
+      const eventId = event.id || `${event.event}_${Date.now()}`;
+      console.log(`✅ Webhook received: ${event.event} (${eventId})`);
+
+      // Idempotency: skip if already processed
+      const eventDoc = admin.firestore().collection("webhookEvents").doc(eventId);
+      const existing = await eventDoc.get();
+      if (existing.exists) {
+        console.log(`⏭️  Event ${eventId} already processed, skipping`);
+        return res.status(200).send("OK (duplicate)");
+      }
+      await eventDoc.set({
+        eventType: event.event,
+        receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+        payload: event,
+      });
+
+      // Handle the events we care about
+      switch (event.event) {
+        case "payment.captured": {
+          const payment = event.payload?.payment?.entity;
+          if (!payment) break;
+          const notes = payment.notes || {};
+          console.log(`💰 Payment captured: ${payment.id} for ${notes.userId || "unknown"} (${notes.tierKey || notes.type || "unknown"})`);
+
+          // Safety net: if this was a tier subscription and verify-payment never ran, upgrade the user
+          if (notes.tierKey && notes.userId) {
+            const userRef = admin.firestore().doc(`users/${notes.userId}`);
+            const userSnap = await userRef.get();
+            if (userSnap.exists && userSnap.data().paymentId !== payment.id) {
+              await userRef.update({
+                tier: notes.tierKey,
+                plansUsed: 0,
+                subscribedAt: admin.firestore.FieldValue.serverTimestamp(),
+                paymentId: payment.id,
+                orderId: payment.order_id,
+                subscribedVia: "webhook_fallback",
+              });
+              console.log(`🛡️  Webhook safety-net upgraded user ${notes.userId} to ${notes.tierKey}`);
+            }
+          }
+          break;
+        }
+        case "payment.failed": {
+          const payment = event.payload?.payment?.entity;
+          console.warn(`❌ Payment failed: ${payment?.id} - ${payment?.error_description || "unknown reason"}`);
+          break;
+        }
+        case "refund.created":
+        case "refund.processed": {
+          const refund = event.payload?.refund?.entity;
+          console.log(`💸 Refund: ${refund?.id} for payment ${refund?.payment_id}`);
+          // TODO: downgrade user tier or mark booking refunded
+          break;
+        }
+        default:
+          console.log(`ℹ️  Unhandled event: ${event.event}`);
+      }
+
+      return res.status(200).send("OK");
+    } catch (err) {
+      console.error("Webhook error:", err.message);
+      // Return 200 anyway so Razorpay doesn't retry for code errors
+      return res.status(200).send("Error logged");
+    }
+  }
+);
+
+// Everything below uses normal JSON parsing
 app.use(express.json({ limit: "10kb" }));
 
 // ── Rate limiter ───────────────────────────────────────────────────────────
@@ -88,6 +183,19 @@ async function verifyAuthToken(req, res, next) {
     next();
   } catch {
     return res.status(401).json({ error:"Unauthorized — invalid auth token" });
+  }
+}
+
+// ── Admin role verifier (must come AFTER verifyAuthToken) ──────────────────
+async function verifyAdmin(req, res, next) {
+  try {
+    const doc = await admin.firestore().doc(`users/${req.uid}`).get();
+    if (!doc.exists || doc.data().role !== "admin") {
+      return res.status(403).json({ error: "Unauthorized — admin only" });
+    }
+    next();
+  } catch {
+    return res.status(500).json({ error: "Authorization check failed" });
   }
 }
 
@@ -129,7 +237,7 @@ function trainerInviteHtml({ name, email, password, type, speciality, location, 
 // ROUTES
 // ═══════════════════════════════════════════════════════════════════════════
 
-app.get("/", (req, res) => res.json({ status:"Mitabhukta backend running", version:"3.0" }));
+app.get("/", (req, res) => res.json({ status:"Mitabhukta backend running", version:"3.1" }));
 
 // ── AI Meal Plan (protected) ───────────────────────────────────────────────
 app.post("/api/meal-plan", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
@@ -180,14 +288,12 @@ app.post("/api/trainer-login", rateLimit(10,60000), async (req,res) => {
     if (trainerData.status==="suspended")
       return res.status(403).json({ error:"Account suspended. Contact support@mitabhukta.com." });
 
-    // Verify password — supports bcrypt and legacy plain text
     let match = false;
     if (trainerData.passwordHash) {
       match = await bcrypt.compare(password, trainerData.passwordHash);
     } else if (trainerData.password) {
       match = trainerData.password === password;
       if (match) {
-        // Auto-migrate legacy plain text to bcrypt
         const hash = await bcrypt.hash(password, 12);
         await trainerDoc.ref.update({ passwordHash:hash, password:admin.firestore.FieldValue.delete() });
         console.log(`✅ Migrated trainer ${email} to bcrypt`);
@@ -195,7 +301,6 @@ app.post("/api/trainer-login", rateLimit(10,60000), async (req,res) => {
     }
     if (!match) return res.status(401).json({ error:"Incorrect password." });
 
-    // Issue JWT token — client never needs to read Firestore directly
     const token = jwt.sign(
       { trainerId:trainerDoc.id, email:trainerData.email, role:"trainer" },
       JWT_SECRET,
@@ -212,14 +317,11 @@ app.post("/api/trainer-login", rateLimit(10,60000), async (req,res) => {
   }
 });
 
-// ── Create trainer (admin only) ────────────────────────────────────────────
-app.post("/api/create-trainer", rateLimit(5,60000), async (req,res) => {
+// ── Create trainer (admin only) — now uses verifyAuthToken + verifyAdmin ──
+app.post("/api/create-trainer", rateLimit(5,60000), verifyAuthToken, verifyAdmin, async (req,res) => {
   try {
-    const { trainerData, adminUid } = req.body;
-    if (!trainerData||!adminUid) return res.status(400).json({ error:"Missing required fields" });
-
-    const adminDoc = await admin.firestore().doc(`users/${adminUid}`).get();
-    if (!adminDoc.exists||adminDoc.data().role!=="admin") return res.status(403).json({ error:"Unauthorized" });
+    const { trainerData } = req.body;
+    if (!trainerData) return res.status(400).json({ error:"Missing required fields" });
 
     const { name, email, password, type, typeIcon, speciality, location, experience, pricePerHour, gender, bio, languages, availableDays } = trainerData;
     if (!name||!email||!password) return res.status(400).json({ error:"Name, email and password required" });
@@ -240,7 +342,7 @@ app.post("/api/create-trainer", rateLimit(5,60000), async (req,res) => {
       languages:(languages||[]).map(l=>sanitizeString(l)), availableDays:availableDays||[],
       sessionTypes:["Video call","In-person"], rating:0, totalSessions:0, totalEarnings:0,
       highlights:[], role:"trainer", status:"active",
-      createdAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:adminUid,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(), createdBy:req.uid,
     };
 
     await admin.firestore().collection("trainers").doc(trainerId).set(savedData);
@@ -260,71 +362,149 @@ app.post("/api/create-trainer", rateLimit(5,60000), async (req,res) => {
   }
 });
 
-// ── Subscription: Create order ─────────────────────────────────────────────
-app.post("/api/create-order", rateLimit(10,60000), async (req,res) => {
+// ── Subscription: Create order — NOW PROTECTED ─────────────────────────────
+app.post("/api/create-order", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { tierKey, userId, email } = req.body;
-    if (!tierKey||!userId) return res.status(400).json({ error:"tierKey and userId required" });
+    const { tierKey } = req.body;
+    const userId = req.uid;       // from token, not body
+    const email  = req.email;     // from token, not body
+    if (!tierKey) return res.status(400).json({ error:"tierKey required" });
     const amount = TIER_PRICES[tierKey];
     if (!amount) return res.status(400).json({ error:"Invalid tier" });
-    const order = await razorpay.orders.create({ amount, currency:"INR", receipt:`rcpt_${userId.slice(0,10)}_${Date.now()}`, notes:{ tierKey, userId, email:email||"" } });
+    const order = await razorpay.orders.create({
+      amount,
+      currency:"INR",
+      receipt:`rcpt_${userId.slice(0,10)}_${Date.now()}`,
+      notes:{ tierKey, userId, email: email || "" }
+    });
     res.json({ orderId:order.id, amount:order.amount });
-  } catch(err) { res.status(500).json({ error:"Failed to create order" }); }
+  } catch(err) {
+    console.error("Create order error:", err.message);
+    res.status(500).json({ error:"Failed to create order" });
+  }
 });
 
-// ── Subscription: Verify payment ───────────────────────────────────────────
-app.post("/api/verify-payment", rateLimit(10,60000), async (req,res) => {
+// ── Subscription: Verify payment — NOW PROTECTED ───────────────────────────
+app.post("/api/verify-payment", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, tierKey, userId } = req.body;
-    if (!razorpay_order_id||!razorpay_payment_id||!razorpay_signature) return res.status(400).json({ error:"Missing payment details" });
-    const expected = crypto.createHmac("sha256",process.env.RAZORPAY_KEY_SECRET).update(razorpay_order_id+"|"+razorpay_payment_id).digest("hex");
-    if (expected!==razorpay_signature) return res.status(400).json({ success:false, error:"Invalid signature" });
-    await admin.firestore().doc(`users/${userId}`).update({ tier:tierKey, plansUsed:0, subscribedAt:admin.firestore.FieldValue.serverTimestamp(), paymentId:razorpay_payment_id, orderId:razorpay_order_id });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, tierKey } = req.body;
+    const userId = req.uid;       // from token, never trust body
+    if (!razorpay_order_id||!razorpay_payment_id||!razorpay_signature||!tierKey) {
+      return res.status(400).json({ error:"Missing payment details" });
+    }
+
+    // Verify signature
+    const expected = crypto.createHmac("sha256",process.env.RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id+"|"+razorpay_payment_id).digest("hex");
+    if (expected!==razorpay_signature) {
+      console.warn(`⚠️ Invalid signature for user ${userId}, order ${razorpay_order_id}`);
+      return res.status(400).json({ success:false, error:"Invalid signature" });
+    }
+
+    // Additional safety: confirm the order's notes match this user
+    try {
+      const order = await razorpay.orders.fetch(razorpay_order_id);
+      if (order?.notes?.userId && order.notes.userId !== userId) {
+        console.warn(`⚠️ Order ${razorpay_order_id} belongs to ${order.notes.userId} but ${userId} tried to claim it`);
+        return res.status(403).json({ success:false, error:"Order does not belong to this user" });
+      }
+      if (order?.notes?.tierKey && order.notes.tierKey !== tierKey) {
+        return res.status(400).json({ success:false, error:"Tier mismatch" });
+      }
+    } catch (fetchErr) {
+      console.warn("Could not fetch order for cross-check:", fetchErr.message);
+      // Continue anyway — signature is the primary security
+    }
+
+    await admin.firestore().doc(`users/${userId}`).update({
+      tier:tierKey,
+      plansUsed:0,
+      subscribedAt:admin.firestore.FieldValue.serverTimestamp(),
+      paymentId:razorpay_payment_id,
+      orderId:razorpay_order_id,
+    });
+    console.log(`✅ Subscription activated: ${userId} → ${tierKey}`);
     res.json({ success:true });
-  } catch(err) { res.status(500).json({ success:false, error:"Payment verification failed" }); }
+  } catch(err) {
+    console.error("Verify payment error:", err.message);
+    res.status(500).json({ success:false, error:"Payment verification failed" });
+  }
 });
 
-// ── Booking: Create Razorpay order ─────────────────────────────────────────
-app.post("/api/create-booking-order", rateLimit(10,60000), async (req,res) => {
+// ── Booking: Create Razorpay order — NOW PROTECTED ─────────────────────────
+app.post("/api/create-booking-order", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { studentId, trainerId, price } = req.body;
-    if (!studentId||!trainerId||!price) return res.status(400).json({ error:"Missing required fields" });
-    const order = await razorpay.orders.create({ amount:Math.round(price*100), currency:"INR", receipt:`booking_${studentId.slice(0,8)}_${Date.now()}`, notes:{ type:"booking", studentId, trainerId } });
+    const { trainerId, price } = req.body;
+    const studentId = req.uid;     // from token
+    if (!trainerId||!price) return res.status(400).json({ error:"Missing required fields" });
+    if (price < 1 || price > 100000) return res.status(400).json({ error:"Invalid price" });
+    const order = await razorpay.orders.create({
+      amount:Math.round(price*100),
+      currency:"INR",
+      receipt:`booking_${studentId.slice(0,8)}_${Date.now()}`,
+      notes:{ type:"booking", studentId, trainerId }
+    });
     res.json({ orderId:order.id, amount:order.amount });
-  } catch(err) { res.status(500).json({ error:"Failed to create booking order" }); }
+  } catch(err) {
+    console.error("Create booking order error:", err.message);
+    res.status(500).json({ error:"Failed to create booking order" });
+  }
 });
 
-// ── Booking: Verify payment + save + send emails ───────────────────────────
-app.post("/api/verify-booking-payment", rateLimit(10,60000), async (req,res) => {
+// ── Booking: Verify payment — NOW PROTECTED ────────────────────────────────
+app.post("/api/verify-booking-payment", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, booking } = req.body;
-    if (!razorpay_order_id||!razorpay_payment_id||!razorpay_signature||!booking) return res.status(400).json({ error:"Missing required fields" });
-    const expected = crypto.createHmac("sha256",process.env.RAZORPAY_KEY_SECRET).update(razorpay_order_id+"|"+razorpay_payment_id).digest("hex");
-    if (expected!==razorpay_signature) return res.status(400).json({ success:false, error:"Invalid signature" });
+    if (!razorpay_order_id||!razorpay_payment_id||!razorpay_signature||!booking) {
+      return res.status(400).json({ error:"Missing required fields" });
+    }
+
+    // Force studentId to be the authenticated user, not whatever the frontend sent
+    if (booking.studentId && booking.studentId !== req.uid) {
+      return res.status(403).json({ error:"Student ID mismatch" });
+    }
+    const studentId = req.uid;
+
+    // Verify signature
+    const expected = crypto.createHmac("sha256",process.env.RAZORPAY_KEY_SECRET)
+      .update(razorpay_order_id+"|"+razorpay_payment_id).digest("hex");
+    if (expected!==razorpay_signature) {
+      return res.status(400).json({ success:false, error:"Invalid signature" });
+    }
 
     const bookingId   = `booking_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
     const bookingData = {
       id:bookingId,
-      studentId:sanitizeString(booking.studentId), studentName:sanitizeString(booking.studentName),
-      studentEmail:sanitizeString(booking.studentEmail), trainerId:sanitizeString(booking.trainerId),
-      trainerName:sanitizeString(booking.trainerName), trainerEmail:sanitizeString(booking.trainerEmail||""),
-      trainerIcon:sanitizeString(booking.trainerIcon), trainerGender:sanitizeString(booking.trainerGender),
-      speciality:sanitizeString(booking.speciality), type:sanitizeString(booking.type),
-      price:Number(booking.price), dateLabel:sanitizeString(booking.dateLabel),
-      dateIso:sanitizeString(booking.dateIso), time:sanitizeString(booking.time),
-      sessionType:sanitizeString(booking.sessionType), notes:sanitizeString(booking.notes||""),
-      status:"Confirmed", paymentId:razorpay_payment_id, orderId:razorpay_order_id,
-      review:null, createdAt:admin.firestore.FieldValue.serverTimestamp(),
+      studentId,
+      studentName:sanitizeString(booking.studentName),
+      studentEmail:sanitizeString(booking.studentEmail || req.email || ""),
+      trainerId:sanitizeString(booking.trainerId),
+      trainerName:sanitizeString(booking.trainerName),
+      trainerEmail:sanitizeString(booking.trainerEmail||""),
+      trainerIcon:sanitizeString(booking.trainerIcon),
+      trainerGender:sanitizeString(booking.trainerGender),
+      speciality:sanitizeString(booking.speciality),
+      type:sanitizeString(booking.type),
+      price:Number(booking.price),
+      dateLabel:sanitizeString(booking.dateLabel),
+      dateIso:sanitizeString(booking.dateIso),
+      time:sanitizeString(booking.time),
+      sessionType:sanitizeString(booking.sessionType),
+      notes:sanitizeString(booking.notes||""),
+      status:"Confirmed",
+      paymentId:razorpay_payment_id,
+      orderId:razorpay_order_id,
+      review:null,
+      createdAt:admin.firestore.FieldValue.serverTimestamp(),
     };
     await admin.firestore().collection("bookings").doc(bookingId).set(bookingData);
 
-    // Send emails (fire and forget)
-    if (booking.studentEmail) {
-      resend.emails.send({ from:FROM, to:booking.studentEmail, subject:`✅ Session Confirmed — ${booking.trainerName} on ${booking.dateLabel}`, html:bookingConfirmationStudentHtml({ studentName:booking.studentName, trainerName:booking.trainerName, speciality:booking.speciality, dateLabel:booking.dateLabel, time:booking.time, sessionType:booking.sessionType, price:booking.price, bookingId }) })
+    if (bookingData.studentEmail) {
+      resend.emails.send({ from:FROM, to:bookingData.studentEmail, subject:`✅ Session Confirmed — ${bookingData.trainerName} on ${bookingData.dateLabel}`, html:bookingConfirmationStudentHtml({ studentName:bookingData.studentName, trainerName:bookingData.trainerName, speciality:bookingData.speciality, dateLabel:bookingData.dateLabel, time:bookingData.time, sessionType:bookingData.sessionType, price:bookingData.price, bookingId }) })
         .catch(e => console.warn("Student email failed:", e.message));
     }
-    if (booking.trainerEmail) {
-      resend.emails.send({ from:FROM, to:booking.trainerEmail, subject:`📅 New Booking — ${booking.studentName} on ${booking.dateLabel}`, html:bookingNotificationTrainerHtml({ trainerName:booking.trainerName, studentName:booking.studentName, speciality:booking.speciality, dateLabel:booking.dateLabel, time:booking.time, sessionType:booking.sessionType, price:booking.price, notes:booking.notes, bookingId }) })
+    if (bookingData.trainerEmail) {
+      resend.emails.send({ from:FROM, to:bookingData.trainerEmail, subject:`📅 New Booking — ${bookingData.studentName} on ${bookingData.dateLabel}`, html:bookingNotificationTrainerHtml({ trainerName:bookingData.trainerName, studentName:bookingData.studentName, speciality:bookingData.speciality, dateLabel:bookingData.dateLabel, time:bookingData.time, sessionType:bookingData.sessionType, price:bookingData.price, notes:bookingData.notes, bookingId }) })
         .catch(e => console.warn("Trainer email failed:", e.message));
     }
 
@@ -336,11 +516,11 @@ app.post("/api/verify-booking-payment", rateLimit(10,60000), async (req,res) => 
   }
 });
 
-// ── Booking: Update ────────────────────────────────────────────────────────
-app.post("/api/update-booking", rateLimit(20,60000), async (req,res) => {
+// ── Booking: Update — NOW PROTECTED, uses req.uid not body ─────────────────
+app.post("/api/update-booking", rateLimit(20,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { bookingId, updates, studentId } = req.body;
-    if (!bookingId||!updates||!studentId) return res.status(400).json({ error:"Missing required fields" });
+    const { bookingId, updates } = req.body;
+    if (!bookingId||!updates) return res.status(400).json({ error:"Missing required fields" });
     const allowed  = ["status","dateLabel","dateIso","time","review"];
     const filtered = {};
     for (const key of allowed) if (updates[key]!==undefined) filtered[key]=updates[key];
@@ -348,10 +528,15 @@ app.post("/api/update-booking", rateLimit(20,60000), async (req,res) => {
     const ref  = admin.firestore().collection("bookings").doc(bookingId);
     const snap = await ref.get();
     if (!snap.exists) return res.status(404).json({ error:"Booking not found" });
-    if (snap.data().studentId!==studentId) return res.status(403).json({ error:"Unauthorized" });
+    if (snap.data().studentId !== req.uid) {
+      return res.status(403).json({ error:"Unauthorized — not your booking" });
+    }
     await ref.update(filtered);
     res.json({ success:true });
-  } catch(err) { res.status(500).json({ error:"Failed to update booking" }); }
+  } catch(err) {
+    console.error("Update booking error:", err.message);
+    res.status(500).json({ error:"Failed to update booking" });
+  }
 });
 
 // ── Trainer: Change password ───────────────────────────────────────────────
@@ -386,12 +571,21 @@ app.post("/api/trainer-change-password", rateLimit(5,60000), async (req,res) => 
   }
 });
 
-// ── Referral: Auto-credit ──────────────────────────────────────────────────
-app.post("/api/apply-referral", rateLimit(5,60000), async (req,res) => {
+// ── Referral: Auto-credit — NOW PROTECTED, uses req.uid ────────────────────
+app.post("/api/apply-referral", rateLimit(5,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { referralCode, newUserId } = req.body;
-    if (!referralCode||!newUserId) return res.status(400).json({ error:"Missing required fields" });
-    const snap = await admin.firestore().collection("users").where("referralCode","==",referralCode.toUpperCase()).limit(1).get();
+    const { referralCode } = req.body;
+    const newUserId = req.uid;     // from token, not body
+    if (!referralCode) return res.status(400).json({ error:"Missing referral code" });
+
+    // Check if this user already has a referredBy — referrals are one-time only
+    const newUserDoc = await admin.firestore().doc(`users/${newUserId}`).get();
+    if (newUserDoc.exists && newUserDoc.data().referredBy) {
+      return res.json({ success:false, message:"Already used a referral" });
+    }
+
+    const snap = await admin.firestore().collection("users")
+      .where("referralCode","==",referralCode.toUpperCase()).limit(1).get();
     if (snap.empty) return res.json({ success:false, message:"Code not found" });
     const referrerDoc = snap.docs[0];
     if (referrerDoc.id===newUserId) return res.json({ success:false, message:"Cannot refer yourself" });
@@ -400,7 +594,10 @@ app.post("/api/apply-referral", rateLimit(5,60000), async (req,res) => {
     await admin.firestore().doc(`users/${newUserId}`).update({ referredBy:referrerDoc.id });
     console.log(`✅ Referral: ${referrerDoc.id} → ${newUserId}`);
     res.json({ success:true });
-  } catch(err) { res.status(500).json({ error:"Failed to apply referral" }); }
+  } catch(err) {
+    console.error("Apply referral error:", err.message);
+    res.status(500).json({ error:"Failed to apply referral" });
+  }
 });
 
 // ── Send verification email ────────────────────────────────────────────────

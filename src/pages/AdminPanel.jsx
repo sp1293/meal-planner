@@ -22,7 +22,7 @@ const TYPE_ICONS = {
 };
 
 export default function AdminPanel({ navigate }) {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [activeTab,     setActiveTab]     = useState("trainers");
   const [trainers,      setTrainers]      = useState([]);
   const [bookings,      setBookings]      = useState([]);
@@ -106,12 +106,12 @@ export default function AdminPanel({ navigate }) {
     if (form.availableDays.length === 0) { setError("Please select at least one available day."); return; }
     setCreating(true);
     try {
+      const token = await user.getIdToken();
       const res = await fetch(`${API}/api/create-trainer`, {
-        method:"POST",
-        headers:{ "Content-Type":"application/json" },
-        body: JSON.stringify({
-          adminUid: profile.uid,
-          trainerData: {
+      method:"POST",
+      headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${token}` },
+      body: JSON.stringify({
+      trainerData: {
             name:         sanitize(form.name),
             email:        sanitize(form.email).toLowerCase(),
             password:     form.password,

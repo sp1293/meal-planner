@@ -196,7 +196,7 @@ async function loginWithEmail(email, password) {
       await createUserDoc(cred.user,{ displayName:sanitize(name), ...extra });
       const refCode = getReferralCodeFromURL();
       if (refCode) {
-        callAPI("apply-referral",{ referralCode:refCode, newUserId:cred.user.uid })
+        callAPI("apply-referral",{ referralCode:refCode })
           .then(()=>{ try { sessionStorage.removeItem("mitabhukta_ref"); } catch {} });
       }
       await signOut(auth);

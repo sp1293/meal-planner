@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 import { db } from "../firebase";
 import { useAuth } from "../context/AuthContext";
 
@@ -7,6 +8,17 @@ const TIME_SLOTS    = ["7:00 AM","8:00 AM","9:00 AM","10:00 AM","11:00 AM","6:00
 const SESSION_TYPES = ["Video call","In-person"];
 const API = process.env.REACT_APP_API_URL?.replace("/api/meal-plan","") || "https://meal-planner-backend-0ul2.onrender.com";
 const RAZORPAY_KEY = process.env.REACT_APP_RAZORPAY_KEY_ID || "rzp_test_SdZk5BUyxiup3p";
+
+// ── Helper: get Firebase auth headers for authenticated API calls ──────────
+async function getAuthHeaders() {
+  const user = getAuth().currentUser;
+  if (!user) throw new Error("Not signed in");
+  const token = await user.getIdToken();
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  };
+}
 
 function getNext14Days() {
   const days = [];
@@ -101,10 +113,11 @@ function getTypeIcon(type) {
   return {"Yoga Instructor":"🧘","Gym Trainer":"🏋️","Nutritionist":"🥗","Physiotherapist":"🩺"}[type]||"💪";
 }
 
+// ── apiCall now sends Firebase auth header automatically ───────────────────
 async function apiCall(endpoint, body) {
   const res = await fetch(`${API}/api/${endpoint}`, {
     method: "POST",
-    headers: {"Content-Type":"application/json"},
+    headers: await getAuthHeaders(),
     body: JSON.stringify(body),
   });
   return res.json();
@@ -197,9 +210,8 @@ export default function MyBookings({ navigate }) {
       const loaded = await loadRazorpay();
       if (!loaded) { setPayError("Failed to load payment gateway. Please try again."); setPaying(false); return; }
 
-      // Step 1: Create order on backend
+      // Step 1: Create order on backend (studentId now read from auth token)
       const orderData = await apiCall("create-booking-order", {
-        studentId: user.uid,
         trainerId: selectedTrainer.id,
         price:     selectedTrainer.pricePerHour,
       });
@@ -233,6 +245,8 @@ export default function MyBookings({ navigate }) {
         handler: async (response) => {
           // Step 3: Verify payment and save booking to Firestore via backend
           try {
+            // studentId is set by backend from auth token; we still send it
+            // for the email but backend will validate it matches the token.
             const bookingPayload = {
               studentId:     user.uid,
               studentName:   profile?.displayName || "",
@@ -292,14 +306,13 @@ export default function MyBookings({ navigate }) {
     }
   }
 
-  // ── Update booking via backend ────────────────────────────────────────────
+  // ── Update booking via backend (studentId now read from auth token) ──────
   async function updateBooking(bookingId, updates) {
     setUpdating(true);
     try {
       const result = await apiCall("update-booking", {
         bookingId,
         updates,
-        studentId: user.uid,
       });
       if (result.success) {
         setBookings(prev => prev.map(b => b.id === bookingId ? {...b, ...updates} : b));
