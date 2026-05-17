@@ -28,7 +28,6 @@ export default function Navbar({ page, navigate }) {
     { label:"Meal Planner",  id:"planner" },
     { label:"Leftover Chef", id:"leftover-chef" },
     { label:"Trainers",      id:"trainers" },
-    { label:"Early Access",  id:"early-access" },
   ] : [];
 
   const dropdownItems = role === "admin"
