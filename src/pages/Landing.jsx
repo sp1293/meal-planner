@@ -73,7 +73,7 @@ export default function Landing({ navigate }) {
         }
       `}</style>
 
-      {/* ── Top announcement bar ──────────────────────────────────── */}
+      {/* ── Top announcement bar ──────────────────────────────────── 
       <div style={{ background: walnutDark, padding: "10px 24px", textAlign: "center" }}>
         <span style={{ fontSize: 11, color: goldPale, letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 500 }}>
           Early access · First 100 members receive 3 months Pro free.{" "}
@@ -82,10 +82,10 @@ export default function Landing({ navigate }) {
             Claim your spot →
           </button>
         </span>
-      </div>
+      </div> */}
 
       {/* ════════════ SCREEN 1: HERO ════════════ */}
-      <section style={{ padding: "48px 0 56px", minHeight: "calc(100vh - 110px)", display: "flex", alignItems: "center" }}>
+      <section style={{ padding: "48px 0 56px", minHeight: "calc(100vh - 0px)", display: "flex", alignItems: "center" }}>
         <div className="ml-hero-grid container" style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 80, alignItems: "center", width: "100%" }}>
 
           {/* Left column */}
