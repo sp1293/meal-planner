@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 const MEAL_TYPES = ["breakfast","lunch","dinner","snack"];
 const MEAL_COLORS = {
@@ -31,7 +33,7 @@ function formatDate(iso) {
 }
 
 export default function CalorieTracker() {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const STORAGE_KEY = `mitabhukta_calories_${profile?.uid || "guest"}`;
   const photoRef    = useRef(null);
 
@@ -55,10 +57,50 @@ export default function CalorieTracker() {
   const [editingTarget, setEditingTarget] = useState(false);
   const [tempTarget,    setTempTarget]    = useState(calorieTarget);
 
+  // ── Load calorie data from the user's account (Firestore) ──────────────
+  const cloudLoaded = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
-    catch {}
-  }, [data, STORAGE_KEY]);
+    if (!user?.uid || cloudLoaded.current) return;
+    (async () => {
+      try {
+        const snap  = await getDoc(doc(db, "users", user.uid));
+        const cloud = snap.exists() ? snap.data().calorieData : null;
+        if (cloud && Object.keys(cloud).length) {
+          setData(cloud);                       // account is the source of truth
+        } else {
+          // First time on the account: push any existing browser data up
+          setData(local => {
+            if (local && Object.keys(local).length) {
+              updateDoc(doc(db, "users", user.uid), { calorieData: local }).catch(() => {});
+            }
+            return local || {};
+          });
+        }
+        const cloudTarget = snap.exists() ? snap.data().calorieTarget : null;
+        if (cloudTarget) setCalorieTarget(parseInt(cloudTarget));
+      } catch {
+        /* offline or read failed — keep using the local copy */
+      } finally {
+        cloudLoaded.current = true;
+      }
+    })();
+  }, [user?.uid]); // eslint-disable-line
+
+  // ── Save: browser cache instantly, account (debounced) ─────────────────
+  useEffect(() => {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch {}
+    if (!user?.uid || !cloudLoaded.current) return;   // never write before the first load
+    const t = setTimeout(() => {
+      // Keep only the last 120 days so the document stays tiny
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 120);
+      const trimmed = Object.fromEntries(
+        Object.entries(data).filter(([date]) => new Date(date) >= cutoff)
+      );
+      updateDoc(doc(db, "users", user.uid), { calorieData: trimmed }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [data, STORAGE_KEY, user?.uid]);
 
   const dayData    = data[selectedDate] || {};
   const allEntries = MEAL_TYPES.flatMap(t => (dayData[t] || []).map(e => ({ ...e, mealType: t })));
@@ -222,7 +264,8 @@ Be realistic with Indian food portions. If you cannot identify the food clearly,
     const t = parseInt(tempTarget);
     if (!isNaN(t) && t > 0) {
       setCalorieTarget(t);
-      localStorage.setItem(`mitabhukta_cal_target_${profile?.uid}`, t);
+      try { localStorage.setItem(`mitabhukta_cal_target_${profile?.uid}`, t); } catch {}
+      if (user?.uid) updateDoc(doc(db, "users", user.uid), { calorieTarget: t }).catch(() => {});
     }
     setEditingTarget(false);
   }
