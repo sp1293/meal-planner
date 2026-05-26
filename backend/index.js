@@ -434,15 +434,23 @@ app.post("/api/verify-payment", rateLimit(10,60000), verifyAuthToken, async (req
 // ── Booking: Create Razorpay order — NOW PROTECTED ─────────────────────────
 app.post("/api/create-booking-order", rateLimit(10,60000), verifyAuthToken, async (req,res) => {
   try {
-    const { trainerId, price } = req.body;
+    const { trainerId } = req.body;
     const studentId = req.uid;     // from token
-    if (!trainerId||!price) return res.status(400).json({ error:"Missing required fields" });
-    if (price < 1 || price > 100000) return res.status(400).json({ error:"Invalid price" });
+    if (!trainerId) return res.status(400).json({ error:"Missing trainerId" });
+
+    // Look up the REAL price from the trainer record — never trust a price from the client
+    const trainerSnap = await admin.firestore().collection("trainers").doc(trainerId).get();
+    if (!trainerSnap.exists) return res.status(404).json({ error:"Trainer not found" });
+    const trainer = trainerSnap.data();
+    if (trainer.status === "suspended") return res.status(403).json({ error:"Trainer unavailable" });
+    const price = Number(trainer.pricePerHour);
+    if (!price || price < 1) return res.status(400).json({ error:"Trainer has no valid price set" });
+
     const order = await razorpay.orders.create({
       amount:Math.round(price*100),
       currency:"INR",
       receipt:`booking_${studentId.slice(0,8)}_${Date.now()}`,
-      notes:{ type:"booking", studentId, trainerId }
+      notes:{ type:"booking", studentId, trainerId, price:String(price) }
     });
     res.json({ orderId:order.id, amount:order.amount });
   } catch(err) {
@@ -463,7 +471,7 @@ app.post("/api/verify-booking-payment", rateLimit(10,60000), verifyAuthToken, as
     if (booking.studentId && booking.studentId !== req.uid) {
       return res.status(403).json({ error:"Student ID mismatch" });
     }
-    const studentId = req.uid;
+const studentId = req.uid;
 
     // Verify signature
     const expected = crypto.createHmac("sha256",process.env.RAZORPAY_KEY_SECRET)
@@ -472,20 +480,39 @@ app.post("/api/verify-booking-payment", rateLimit(10,60000), verifyAuthToken, as
       return res.status(400).json({ success:false, error:"Invalid signature" });
     }
 
+    // Pull the trusted price + trainer from the order we created server-side
+    // (never trust the price the browser sends)
+    let trustedPrice     = null;
+    let trustedTrainerId = sanitizeString(booking.trainerId);
+    try {
+      const order = await razorpay.orders.fetch(razorpay_order_id);
+      if (order?.notes?.studentId && order.notes.studentId !== studentId) {
+        return res.status(403).json({ success:false, error:"Order does not belong to this user" });
+      }
+      if (order?.notes?.price)     trustedPrice     = Number(order.notes.price);
+      if (order?.notes?.trainerId) trustedTrainerId = order.notes.trainerId;
+    } catch (e) {
+      console.warn("Could not fetch booking order:", e.message);
+      return res.status(400).json({ success:false, error:"Could not verify order" });
+    }
+    if (!trustedPrice || trustedPrice < 1) {
+      return res.status(400).json({ success:false, error:"Invalid order price" });
+    }
+
     const bookingId   = `booking_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
     const bookingData = {
       id:bookingId,
       studentId,
       studentName:sanitizeString(booking.studentName),
       studentEmail:sanitizeString(booking.studentEmail || req.email || ""),
-      trainerId:sanitizeString(booking.trainerId),
+      trainerId:trustedTrainerId,
       trainerName:sanitizeString(booking.trainerName),
       trainerEmail:sanitizeString(booking.trainerEmail||""),
       trainerIcon:sanitizeString(booking.trainerIcon),
       trainerGender:sanitizeString(booking.trainerGender),
       speciality:sanitizeString(booking.speciality),
       type:sanitizeString(booking.type),
-      price:Number(booking.price),
+      price:trustedPrice,
       dateLabel:sanitizeString(booking.dateLabel),
       dateIso:sanitizeString(booking.dateIso),
       time:sanitizeString(booking.time),
@@ -630,6 +657,19 @@ app.post("/api/send-welcome", rateLimit(5,60000), async (req,res) => {
     await resend.emails.send({ from:FROM, to:email, subject:`Welcome to Mitabhukta, ${sanitizeString(name)||"there"}! 🎉`, html:`<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f5f5f0;font-family:'Helvetica Neue',Arial,sans-serif;"><table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f0;padding:40px 0;"><tr><td align="center"><table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:16px;overflow:hidden;"><tr><td style="background:linear-gradient(135deg,#052e16 0%,#14532d 50%,#166534 100%);padding:40px;text-align:center;"><div style="font-size:48px;">🎉</div><div style="font-family:Georgia,serif;font-size:26px;font-weight:700;color:#fff;margin-top:12px;">Welcome to Mitabhukta!</div></td></tr><tr><td style="padding:40px;"><h2 style="font-family:Georgia,serif;font-size:20px;color:#052e16;margin:0 0 14px;">Hi ${sanitizeString(name)||"there"}, you're all set! 👋</h2><p style="font-size:15px;color:#4b5563;line-height:1.7;margin:0 0 28px;">Your email is verified and your account is active.</p><table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center"><a href="https://mitabhukta.com" style="display:inline-block;background:#166534;color:#fff;font-size:16px;font-weight:700;padding:16px 48px;border-radius:8px;text-decoration:none;">Go to Dashboard →</a></td></tr></table></td></tr><tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;"><p style="font-size:12px;color:#9ca3af;margin:0;">© ${new Date().getFullYear()} Mitabhukta · Bengaluru, India</p></td></tr></table></td></tr></table></body></html>` });
     res.json({ success:true });
   } catch(err) { res.status(500).json({ error:"Failed to send welcome email" }); }
+});
+
+// ── Increment a user's meal-plan usage (server-side; client writes are blocked by rules) ──
+app.post("/api/increment-plan-usage", rateLimit(30,60000), verifyAuthToken, async (req,res) => {
+  try {
+    await admin.firestore().doc(`users/${req.uid}`).update({
+      plansUsed: admin.firestore.FieldValue.increment(1),
+    });
+    res.json({ success:true });
+  } catch(err) {
+    console.error("Increment plan usage error:", err.message);
+    res.status(500).json({ error:"Failed to update usage" });
+  }
 });
 
 // ── 404 + error handlers ───────────────────────────────────────────────────

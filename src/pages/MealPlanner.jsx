@@ -25,7 +25,7 @@ const WEIGHT_GOAL_CONFIG = {
 };
 
 export default function MealPlanner({ navigate }) {
-  const { user, profile, updateUserProfile } = useAuth();
+  const { user, profile, updateUserProfile, incrementPlanUsage } = useAuth();
   const { plan, canGenerate } = useSub();
   const shareCardRef = useRef(null);
 
@@ -299,8 +299,7 @@ Respond ONLY with valid JSON (no markdown, no backticks):
         updateUserProfile({ mealPrefs: { allergies, healthConditions, diet, vegNonVeg, cuisine, weightGoal } });
       }
       if (user && plan.plansPerMonth < 999) {
-        await updateDoc(doc(db,"users",user.uid),{ plansUsed:increment(1) });
-        await updateUserProfile({ plansUsed:plansUsed+1 });
+        await incrementPlanUsage();
       }
     } catch(e) {
       setError("Failed to generate meal plan. Please try again. "+(e.message||""));

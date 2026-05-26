@@ -266,6 +266,13 @@ async function loginWithEmail(email, password) {
 
   function clearJustSignedUp() {}
 
+  // ── Increment meal-plan usage via backend (Firestore rules block client writes) ──
+  async function incrementPlanUsage() {
+    const { ok } = await callAPI("increment-plan-usage", {});
+    if (ok) setProfile(p => p ? { ...p, plansUsed: (p.plansUsed || 0) + 1 } : p);
+    return ok;
+  }
+
   return (
     <AuthContext.Provider value={{
       user, profile, loading,
@@ -274,6 +281,7 @@ async function loginWithEmail(email, password) {
       loginWithEmail, signupWithEmail, loginWithGoogle,
       logout, updateUserProfile, resetPassword,
       resendVerificationEmail, clearJustSignedUp,
+      incrementPlanUsage,
     }}>
       {children}
     </AuthContext.Provider>
