@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { db } from "../firebase";
 
 const GOAL_TYPES = [
   { id: "weight",   label: "Target Weight",   unit: "kg",    icon: "⚖️",  color: "#3b82f6" },
@@ -24,7 +26,7 @@ function formatShortDate(iso) {
 }
 
 export default function GoalTracker({ navigate }) {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
   const STORAGE_KEY  = `mitabhukta_goals_${profile?.uid || "guest"}`;
   const LOG_KEY      = `mitabhukta_goal_logs_${profile?.uid || "guest"}`;
   const chartRef     = useRef(null);
@@ -46,15 +48,65 @@ export default function GoalTracker({ navigate }) {
   const [logForm,     setLogForm]     = useState({ weight: "", steps: "", water: "", workouts: "" });
   const [savedToday,  setSavedToday]  = useState(false);
 
+  // ── Load goals & logs from the user's account (Firestore) ──────────────
+  const cloudLoaded = useRef(false);
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(goals)); }
-    catch {}
-  }, [goals, STORAGE_KEY]);
+    if (!user?.uid || cloudLoaded.current) return;
+    (async () => {
+      try {
+        const snap       = await getDoc(doc(db, "users", user.uid));
+        const cloudGoals = snap.exists() ? snap.data().fitnessGoals : null;
+        const cloudLogs  = snap.exists() ? snap.data().goalLogs : null;
+
+        if (cloudGoals && typeof cloudGoals === "object") {
+          setGoals(cloudGoals);
+        } else {
+          setGoals(local => {
+            updateDoc(doc(db, "users", user.uid), { fitnessGoals: local }).catch(() => {});
+            return local;
+          });
+        }
+
+        if (cloudLogs && Object.keys(cloudLogs).length) {
+          setLogs(cloudLogs);
+        } else {
+          setLogs(local => {
+            if (local && Object.keys(local).length) {
+              updateDoc(doc(db, "users", user.uid), { goalLogs: local }).catch(() => {});
+            }
+            return local || {};
+          });
+        }
+      } catch {
+        /* offline or read failed — keep the local copy */
+      } finally {
+        cloudLoaded.current = true;
+      }
+    })();
+  }, [user?.uid]); // eslint-disable-line
 
   useEffect(() => {
-    try { localStorage.setItem(LOG_KEY, JSON.stringify(logs)); }
-    catch {}
-  }, [logs, LOG_KEY]);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(goals)); } catch {}
+    if (!user?.uid || !cloudLoaded.current) return;
+    const t = setTimeout(() => {
+      updateDoc(doc(db, "users", user.uid), { fitnessGoals: goals }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [goals, STORAGE_KEY, user?.uid]);
+
+  useEffect(() => {
+    try { localStorage.setItem(LOG_KEY, JSON.stringify(logs)); } catch {}
+    if (!user?.uid || !cloudLoaded.current) return;
+    const t = setTimeout(() => {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - 120);
+      const trimmed = Object.fromEntries(
+        Object.entries(logs).filter(([date]) => new Date(date) >= cutoff)
+      );
+      updateDoc(doc(db, "users", user.uid), { goalLogs: trimmed }).catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+  }, [logs, LOG_KEY, user?.uid]);
 
   useEffect(() => {
     if (activeTab === "progress") {
